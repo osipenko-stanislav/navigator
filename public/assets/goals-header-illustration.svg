@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="389.023" height="299.617" viewBox="0 0 389.023 299.617" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="decorative-elements">
+<ellipse id="circle-large" cx="194.671" cy="149.967" rx="181.356" ry="73.2398" stroke="#775AFF" stroke-width="1.16126" stroke-miterlimit="10" stroke-dasharray="4.88 4.88"/>
+<ellipse id="circle-small" cx="194.512" cy="149.808" rx="181.356" ry="73.2398" transform="rotate(28 194.512 149.808)" stroke="#141414" stroke-width="1.16126" stroke-miterlimit="10"/>
+<line id="line-horizontal" x1="213.329" y1="76.9889" x2="176.955" y2="222.878" stroke="#141414" stroke-width="1.16126"/>
+<line id="line-vertical" x1="39.96" y1="111.04" x2="349.311" y2="187.768" stroke="#775AFF" stroke-width="1.16126" stroke-miterlimit="10" stroke-dasharray="4.88 4.88"/>
+<path id="star" d="M190.338 130.43C190.779 126.073 197.128 126.073 197.569 130.43L197.92 133.903C198.56 140.225 203.56 145.225 209.882 145.865L213.355 146.216C217.712 146.657 217.712 153.006 213.355 153.447L209.882 153.798C203.56 154.438 198.56 159.438 197.92 165.76L197.569 169.233C197.128 173.59 190.779 173.59 190.338 169.233L189.987 165.76C189.347 159.438 184.347 154.438 178.025 153.798L174.552 153.447C170.195 153.006 170.195 146.657 174.552 146.216L178.025 145.865C184.347 145.224 189.346 140.225 189.987 133.903L190.338 130.43Z" fill="#775AFF" stroke="white" stroke-width="3.48761"/>
+</g>
+</svg>
