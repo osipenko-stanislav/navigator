@@ -1,5 +1,7 @@
 # ЦПК
 
+[![Deploy to GitHub Pages](https://github.com/osipenko-stanislav/navigator/actions/workflows/pages.yml/badge.svg)](https://github.com/osipenko-stanislav/navigator/actions/workflows/pages.yml)
+
 Интерактивный прототип карьерного навигатора и учебного планировщика Центрального университета.
 
 ## Локальный запуск
