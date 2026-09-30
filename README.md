@@ -13,3 +13,5 @@ python3 -m http.server 4173
 ## Публикация
 
 Каждый push в ветку `main` автоматически публикует статический сайт через GitHub Pages. В настройках репозитория в разделе **Settings → Pages** источником публикации должен быть выбран **GitHub Actions**.
+
+Опубликованная версия: <https://osipenko-stanislav.github.io/navigator/>
