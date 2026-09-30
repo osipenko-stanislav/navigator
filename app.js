@@ -182,7 +182,7 @@ let catalogSearch = ''
 let catalogSemesters = new Set()
 let catalogCategories = new Set()
 let catalogWorkloads = new Set()
-let openGlossaryTerm = null
+let openGlossaryTerms = new Set()
 
 function savePlannerState() {
   try {
@@ -639,27 +639,29 @@ function catalogCourseCard(course) {
   const description = plannerCourseDescriptions[course.id]
     || `Курс «${course.title}» помогает развивать профильные знания и дополняет учебную траекторию.`
   const prerequisiteTitles = course.prerequisites.map((id) => findPlannerCourse(id)?.title).filter(Boolean)
+  const postrequisiteCount = plannerCourses.filter((candidate) => candidate.prerequisites.includes(course.id)).length
 
   return `
-    <article class="education-card catalog-course-card ${placement ? 'catalog-course-card--planned' : ''}">
+    <article class="education-card planner-course catalog-course-card ${placement ? 'catalog-course-card--planned' : ''}">
       ${controlButton({
-        className: 'catalog-course-card__open',
+        className: 'planner-course__open catalog-course-card__open',
         attributes: `aria-label="Подробнее о курсе «${course.title}»" data-catalog-course-open="${course.id}"`,
-        content: `<span class="catalog-course-card__top">
-          <span class="planner-course__category">${course.category}</span>
-          <span class="planner-course__load">${course.workload} пары в неделю</span>
-        </span>
-        <strong class="catalog-course-card__title">${course.title}</strong>
-        <span class="catalog-course-card__description">${description}</span>
-        <span class="catalog-course-card__details">
-          <span><b>Семестры</b><span>${course.available.join(', ')}</span></span>
-          <span><b>Пререквизиты</b><span>${prerequisiteTitles.length ? prerequisiteTitles.length : 'Нет'}</span></span>
-        </span>
-        <span class="catalog-course-card__footer">
-          <span class="catalog-course-card__status">${placement ? `В плане · ${placement.semester} семестр` : 'Не добавлен'}</span>
-          <span class="catalog-course-card__link">Подробнее</span>
+        content: `<span class="planner-course__content">
+          <span class="planner-course__title">${course.title}</span>
+          <span class="planner-course__tags">
+            <span class="planner-course__tag">${course.category}</span>
+            <span class="planner-course__tag">${course.workload} пары в неделю</span>
+            <span class="planner-course__tag">${course.available.join(', ')} семестр</span>
+            <span class="planner-course__tag">Пререквизиты: ${prerequisiteTitles.length}</span>
+            ${postrequisiteCount ? `<span class="planner-course__tag">Постреквизиты: ${postrequisiteCount}</span>` : ''}
+          </span>
+          <span class="planner-course__note">${description}</span>
         </span>`,
       })}
+      <div class="planner-course__footer catalog-course-card__footer">
+        ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-course__about', content: 'О курсе', attributes: `data-catalog-course-open="${course.id}" aria-label="Подробнее о курсе «${course.title}»"` })}
+        <span class="catalog-course-card__status">${placement ? `В плане · ${placement.semester} семестр` : `${course.available.join(', ')} семестр`}</span>
+      </div>
     </article>`
 }
 
@@ -681,7 +683,7 @@ function catalogTemplate() {
           <p>Исследуй доступные курсы и открывай карточки, чтобы посмотреть подробности.</p>
         </div>
         ${catalogSearch || catalogSemesters.size || catalogCategories.size || catalogWorkloads.size
-          ? controlButton({ className: 'flat-button flat-button--neutral catalog__reset', content: 'Сбросить фильтры', attributes: 'data-catalog-reset' })
+          ? controlButton({ className: 'flat-button flat-button--neutral flat-button--text catalog__reset', content: 'Сбросить фильтры', attributes: 'data-catalog-reset' })
           : ''}
       </div>
       <div class="catalog-filters">
@@ -721,7 +723,7 @@ function catalogTemplate() {
 }
 
 function glossaryTermTemplate(item) {
-  const expanded = openGlossaryTerm === item.id
+  const expanded = openGlossaryTerms.has(item.id)
   return `
     <article class="glossary-term ${expanded ? 'glossary-term--expanded' : ''}" data-glossary-term="${item.id}">
       ${controlButton({
@@ -753,12 +755,15 @@ function plannerCourseTemplate(item, semester, index) {
   const postrequisiteCount = plannerCourses.filter((candidate) => candidate.prerequisites.includes(course.id)).length
 
   return `
-    <article class="education-card planner-course ${conflict ? 'planner-course--conflict' : ''}" data-planner-drag-handle data-planner-course="${course.id}" data-planner-semester="${semester}" data-planner-index="${index}">
+    <article class="education-card planner-course ${item.completed ? 'planner-course--completed' : ''} ${conflict ? 'planner-course--conflict' : ''}" data-planner-drag-handle data-planner-course="${course.id}" data-planner-semester="${semester}" data-planner-index="${index}">
       ${controlButton({
         className: 'planner-course__open',
         attributes: `aria-label="Подробнее о курсе «${course.title}»" aria-describedby="planner-drag-instructions" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight" data-planner-course-open="${course.id}"`,
         content: `<span class="planner-course__content">
-          <span class="planner-course__title">${course.title}</span>
+          <span class="planner-course__heading-line">
+            <span class="planner-course__title">${course.title}</span>
+            ${item.completed ? `<img class="planner-course__completed-icon" src="${ASSET}check-verified.svg" width="16" height="16" alt="Пройден">` : ''}
+          </span>
           <span class="planner-course__tags">
             ${prerequisiteTitles.length ? '<span class="planner-course__tag">Пререквизит</span>' : ''}
             ${postrequisiteCount ? '<span class="planner-course__tag">Постреквизит</span>' : ''}
@@ -768,7 +773,7 @@ function plannerCourseTemplate(item, semester, index) {
         </span>`,
       })}
       <div class="planner-course__footer">
-        ${controlButton({ className: 'flat-button flat-button--neutral planner-course__about', content: 'О курсе', attributes: `data-planner-course-open="${course.id}" aria-label="Подробнее о курсе «${course.title}»"` })}
+        ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-course__about', content: 'О курсе', attributes: `data-planner-course-open="${course.id}" aria-label="Подробнее о курсе «${course.title}»"` })}
         <div class="planner-course__actions">
           ${!item.fixed ? controlButton({ className: 'flat-button planner-course__remove', content: `${icon('trash.svg', 18)}<span>Удалить</span>`, attributes: `data-planner-remove data-course-id="${course.id}" data-semester="${semester}"` }) : '<span class="planner-course__fixed">Обязательный</span>'}
         </div>
@@ -815,7 +820,7 @@ function plannerPickerTemplate(semester) {
               <h5 class="planner-course__title">${course.title}</h5>
             </div>
             <div class="planner-course__footer planner-picker-course__footer">
-              ${controlButton({ className: 'flat-button flat-button--neutral planner-course__add', content: 'Добавить', attributes: `data-planner-add data-course-id="${course.id}" data-semester="${semester}"` })}
+              ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-course__add', content: 'Добавить', attributes: `data-planner-add data-course-id="${course.id}" data-semester="${semester}"` })}
             </div>
           </article>`).join('') : `
           <div class="planner-picker__empty">
@@ -834,7 +839,6 @@ function plannerSemesterTemplate(semester) {
   const load = getSemesterLoad(semester)
   const credits = items.reduce((sum, item) => sum + Math.max(2, Math.round((findPlannerCourse(item.id)?.workload || 0) * 1.5)), 0)
   const expanded = !plannerState.collapsedSemesters.includes(semester)
-  const completedCount = items.filter((item) => item.completed).length
   const conflicts = items.filter((item) => courseHasConflict(item.id, semester))
 
   return `
@@ -848,7 +852,6 @@ function plannerSemesterTemplate(semester) {
               <span class="planner-semester__heading" id="planner-semester-${semester}">${semester} семестр</span>
               ${load ? `<span class="badge badge--outline">${load} ${load === 1 ? 'пара' : load < 5 ? 'пары' : 'пар'} в неделю</span>` : ''}
               ${credits ? `<span class="badge badge--outline">${credits} кредитов</span>` : ''}
-              ${completedCount ? `<span class="badge badge--positive">${icon('check-verified.svg', 16)}${completedCount === items.length ? 'Пройден' : `${completedCount} из ${items.length} курсов завершено`}</span>` : ''}
               ${semester === CURRENT_SEMESTER ? '<span class="badge badge--current">Текущий</span>' : ''}
             </span>`,
           })}
@@ -865,8 +868,8 @@ function plannerSemesterTemplate(semester) {
           <div class="planner-semester__toolbar">
             <strong>Курсы семестра</strong>
             <div>
-              ${controlButton({ className: 'flat-button flat-button--neutral planner-add-button', content: `${icon('planner-plus.svg', 18)}<span>Курс</span>`, attributes: `data-planner-picker-toggle="${semester}" aria-expanded="${plannerPickerSemester === semester}"` })}
-              ${items.some((item) => !item.fixed) ? controlButton({ className: 'flat-button flat-button--neutral planner-reset-button', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
+              ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-add-button', content: `${icon('planner-plus.svg', 18)}<span>Курс</span>`, attributes: `data-planner-picker-toggle="${semester}" aria-expanded="${plannerPickerSemester === semester}"` })}
+              ${items.some((item) => !item.fixed) ? controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-reset-button', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
               ${controlButton({ className: 'planner-semester__chevron-button', attributes: `aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${semester} семестр" aria-expanded="${expanded}" aria-controls="planner-semester-panel-${semester}" data-planner-semester-toggle="${semester}"`, content: icon('chevron-down.svg', 18) })}
             </div>
           </div>
@@ -888,7 +891,6 @@ function plannerTemplate() {
   const summary = plannerSummary()
   const conflicts = getPlannerConflicts().length
   const usedCredits = Object.values(plannerState.semesters).flat().reduce((sum, item) => sum + Math.max(2, Math.round((findPlannerCourse(item.id)?.workload || 0) * 1.5)), 0)
-  const completedSemesters = Array.from({ length: 8 }, (_, index) => plannerState.semesters[index + 1]).filter((items) => items.length && items.every((item) => item.completed)).length
 
   return `
     <section class="planner" aria-labelledby="planner-title">
@@ -899,7 +901,7 @@ function plannerTemplate() {
           <p>Определи, что для тебя сейчас в приоритете: индустрия,<br>предпринимательство, наука или только обучение.</p>
         </div>
         <div class="planner__primary-actions">
-          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
+          ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
           ${controlButton({ className: 'flat-button flat-button--primary planner-trajectory-button', content: `${icon('stars.svg', 20)}<span>Подобрать траекторию</span>`, attributes: 'data-planner-trajectory' })}
         </div>
       </div>
@@ -913,7 +915,7 @@ function plannerTemplate() {
       </div>
       <div class="planner-semesters-heading">
         <h3>Семестры</h3>
-        <span class="badge badge--positive">${icon('check-verified.svg', 16)}${completedSemesters} из 5 семестров завершено</span>
+        <span class="badge badge--positive">${icon('check-verified.svg', 16)}${summary.completed} из ${summary.planned} курсов завершено</span>
         <div class="planner__settings">
           ${toggleControl({ inputAttributes: `data-planner-hide-completed ${plannerState.hideCompletedSemesters ? 'checked' : ''}`, label: 'Скрыть пройденные' })}
         </div>
@@ -1277,23 +1279,18 @@ function movePlannerCourse(courseId, targetSemester, targetIndex) {
 
 function openPlannerResetDialog(semester = null) {
   previouslyFocused = document.activeElement
-  const title = semester ? `Сбросить курсы ${semester}-го семестра?` : 'Сбросить весь учебный план?'
-  const description = semester
-    ? 'Необязательные курсы этого семестра будут удалены.'
-    : 'Можно сохранить уже пройденные и обязательные курсы.'
 
   document.querySelector('#modal-root').innerHTML = `
     <div class="modal-backdrop" role="presentation">
-      <div class="goal-dialog planner-dialog" role="alertdialog" aria-modal="true" aria-labelledby="planner-reset-title" aria-describedby="planner-reset-description" tabindex="-1">
+      <div class="goal-dialog planner-dialog planner-reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="planner-reset-title" aria-describedby="planner-reset-description" tabindex="-1">
         ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть"' })}
         <div class="goal-dialog__header">
-          <h2 id="planner-reset-title">${title}</h2>
-          <p class="goal-dialog__lead" id="planner-reset-description">${description}</p>
+          <h2 id="planner-reset-title">Сброс курсов</h2>
+          <p class="goal-dialog__lead" id="planner-reset-description">После сброса курсов вернуть их нельзя</p>
         </div>
-        ${semester ? '' : toggleControl({ inputAttributes: 'data-planner-keep-completed checked', label: 'Сохранить пройденные курсы' })}
         <div class="goal-dialog__actions">
-          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
-          ${controlButton({ className: 'flat-button flat-button--primary', content: 'Сбросить', attributes: `data-planner-reset-confirm ${semester ? `data-semester="${semester}"` : ''}` })}
+          ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text', content: 'Отмена', attributes: 'data-close-dialog' })}
+          ${controlButton({ className: 'flat-button flat-button--danger', content: 'Сбросить', attributes: `data-planner-reset-confirm ${semester ? `data-semester="${semester}"` : ''}` })}
         </div>
       </div>
     </div>`
@@ -1312,41 +1309,62 @@ function openPlannerCourseDrawer(courseId) {
     .map((item) => item.title)
   const description = plannerCourseDescriptions[courseId]
     || `Курс «${course.title}» развивает профильные знания и помогает подготовиться к следующим этапам учебной траектории.`
+  const hasConflict = placement ? courseHasConflict(courseId, placement.semester) : false
+  const recommendedSemester = course.available[0]
+  const season = recommendedSemester % 2 ? 'Осень' : 'Весна'
+  const specializations = course.category === 'Soft'
+    ? ['Для всех специализаций']
+    : course.category === 'Project'
+      ? ['Мобильная разработка', 'Веб-разработка']
+      : ['Разработка программного обеспечения']
+  const courseType = course.category === 'Core' ? 'Major core' : course.category
+  const prerequisiteRows = course.prerequisites.map((id) => {
+    const prerequisite = findPlannerCourse(id)
+    const prerequisitePlacement = findPlannerItem(id)
+    const completed = Boolean(prerequisitePlacement?.item.completed)
+    return `<li class="course-drawer__relation ${completed ? 'is-complete' : 'is-missing'}"><img src="${ASSET}${completed ? 'course-drawer-prerequisite-complete.svg' : 'course-drawer-warning.svg'}" width="20" height="20" alt="">${prerequisite?.title || id}</li>`
+  }).join('')
+  const postrequisiteRows = postrequisiteTitles.map((title) => `<li class="course-drawer__relation"><img src="${ASSET}course-drawer-postrequisite.svg" width="20" height="20" alt="">${title}</li>`).join('')
 
   previouslyFocused = document.activeElement
   document.querySelector('#modal-root').innerHTML = `
     <div class="modal-backdrop modal-backdrop--sheet" role="presentation">
       <aside class="course-drawer" role="dialog" aria-modal="true" aria-label="О курсе: ${course.title}" aria-describedby="course-drawer-description" tabindex="-1">
-        ${controlButton({ className: 'goal-dialog__close course-drawer__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+        ${controlButton({ className: 'goal-dialog__close course-drawer__close', content: icon('course-drawer-close.svg', 24), attributes: 'aria-label="Закрыть" data-close-dialog' })}
         <header class="course-drawer__header">
           <h2 id="course-drawer-title">О курсе</h2>
           <p id="course-drawer-description">${course.title}</p>
+          <img class="course-drawer__character" src="${ASSET}course-drawer-character.png" width="198" height="208" alt="">
         </header>
         <div class="course-drawer__content">
           <div class="course-drawer__scroll">
+            ${hasConflict ? `<div class="course-drawer__warning" role="status">
+              ${icon('course-drawer-warning.svg', 20)}
+              <div><strong>Не все пререквизиты выполнены</strong><p>Нужно пройти: ${prerequisiteTitles.join(', ') || 'обязательные курсы программы'}</p></div>
+            </div>` : ''}
+            <div class="course-drawer__syllabus">
+              <div><span>Учебный план курса</span><strong>Темплан</strong></div>
+              <img src="${ASSET}course-drawer-cap.png" width="124" height="76" alt="">
+            </div>
             <section class="course-drawer__section">
               <h3>Описание</h3>
               <p>${description}</p>
             </section>
-            <section class="course-drawer__section">
-              <h3>Тип курса</h3>
-              <p>${course.category}</p>
-            </section>
-            <section class="course-drawer__section">
-              <h3>Доступные семестры</h3>
-              <p>${course.available.map((semester) => `${semester} семестр`).join(', ')}</p>
-            </section>
-            <section class="course-drawer__section">
-              <h3>Академическая нагрузка</h3>
-              <p>${course.workload} пары в неделю</p>
-            </section>
+            <dl class="course-drawer__facts">
+              <div><dt>Год поступления</dt><dd>2026–2030</dd></div>
+              <div><dt>Тип курса</dt><dd><span class="course-drawer__badge course-drawer__badge--type">${courseType}</span></dd></div>
+              <div><dt>Специализация</dt><dd><ul class="course-drawer__specializations">${specializations.map((item) => `<li><img src="${ASSET}course-drawer-list.svg" width="20" height="20" alt="">${item}</li>`).join('')}</ul></dd></div>
+              <div><dt>Осень / весна</dt><dd><span class="course-drawer__badge course-drawer__badge--season">${season}</span></dd></div>
+              <div><dt>Рекомендованный к прохождению семестр</dt><dd><span class="course-drawer__badge course-drawer__badge--semester">${recommendedSemester} семестр</span></dd></div>
+              <div><dt>Академическая нагрузка</dt><dd>${course.workload} пары в неделю</dd></div>
+            </dl>
             <section class="course-drawer__section">
               <h3>Пререквизиты</h3>
-              <p>${prerequisiteTitles.length ? prerequisiteTitles.join(', ') : 'Нет'}</p>
+              ${prerequisiteRows ? `<ul class="course-drawer__relations">${prerequisiteRows}</ul>` : '<p>Нет</p>'}
             </section>
             <section class="course-drawer__section">
               <h3>Постреквизиты</h3>
-              <p>${postrequisiteTitles.length ? postrequisiteTitles.join(', ') : 'Нет'}</p>
+              ${postrequisiteRows ? `<ul class="course-drawer__relations">${postrequisiteRows}</ul>` : '<p>Нет</p>'}
             </section>
           </div>
           <footer class="course-drawer__footer">
@@ -1484,7 +1502,7 @@ function restartScenario() {
   catalogSemesters.clear()
   catalogCategories.clear()
   catalogWorkloads.clear()
-  openGlossaryTerm = null
+  openGlossaryTerms.clear()
   requestedStudyTab = null
   clearPlannerPointerDrag()
   setModalState(false)
@@ -1559,9 +1577,10 @@ root.addEventListener('click', (event) => {
   const glossaryToggle = event.target.closest('[data-glossary-toggle]')
   if (glossaryToggle) {
     const termId = glossaryToggle.dataset.glossaryToggle
-    openGlossaryTerm = openGlossaryTerm === termId ? null : termId
+    if (openGlossaryTerms.has(termId)) openGlossaryTerms.delete(termId)
+    else openGlossaryTerms.add(termId)
     root.querySelectorAll('[data-glossary-term]').forEach((term) => {
-      const expanded = term.dataset.glossaryTerm === openGlossaryTerm
+      const expanded = openGlossaryTerms.has(term.dataset.glossaryTerm)
       const toggle = term.querySelector('[data-glossary-toggle]')
       const panel = term.querySelector('.glossary-term__panel')
       term.classList.toggle('glossary-term--expanded', expanded)
@@ -1670,7 +1689,7 @@ root.addEventListener('click', (event) => {
   const plannerResetConfirm = event.target.closest('[data-planner-reset-confirm]')
   if (plannerResetConfirm) {
     const semester = plannerResetConfirm.dataset.semester ? Number(plannerResetConfirm.dataset.semester) : null
-    const keepCompleted = root.querySelector('[data-planner-keep-completed]')?.checked ?? true
+    const keepCompleted = Boolean(semester)
     resetPlanner({ semester, keepCompleted })
     closeDialog(() => renderPlannerPanel({ focusSelector: semester ? `[data-planner-picker-toggle="${semester}"]` : '[data-planner-reset-all]' }))
   }
