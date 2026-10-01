@@ -1,5 +1,5 @@
 import { checkboxControl, chipControl, controlButton, fieldControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=10'
-import { COURSE_CATALOG_SOURCE, courseCatalog } from './courses.js?v=2'
+import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
 const ASSET = new URL('./public/assets/', APP_ROOT_URL).href
@@ -1561,13 +1561,17 @@ const screenRoutes = {
 function getScreenFromLocation() {
   const segments = window.location.pathname.split('/').filter(Boolean)
   const screen = segments.at(-1)?.replace(/\.html$/, '') || 'goals'
+  const view = new URLSearchParams(window.location.search).get('view')
+  if (screen === 'study-goal' && view === 'industry') return 'industry-goal'
+  if (screen === 'study-goal' && view === 'vacancy') return 'vacancy'
   return screenRoutes[screen] ? screen : 'goals'
 }
 
 const appRootPath = APP_ROOT_URL.pathname
 
 function getScreenUrl(screen) {
-  if (screen === 'vacancy' && selectedVacancyId) return `${appRootPath}vacancy/?id=${encodeURIComponent(selectedVacancyId)}`
+  if (screen === 'industry-goal') return `${appRootPath}study-goal/?view=industry`
+  if (screen === 'vacancy' && selectedVacancyId) return `${appRootPath}study-goal/?view=vacancy&id=${encodeURIComponent(selectedVacancyId)}`
   return `${appRootPath}${screen}/`
 }
 
