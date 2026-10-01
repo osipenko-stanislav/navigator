@@ -1,5 +1,5 @@
 import { checkboxControl, chipControl, controlButton, fieldControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=10'
-import { COURSE_CATALOG_SOURCE, courseCatalog } from './data/courses.js?v=1'
+import { COURSE_CATALOG_SOURCE, courseCatalog } from './courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
 const ASSET = new URL('./public/assets/', APP_ROOT_URL).href
