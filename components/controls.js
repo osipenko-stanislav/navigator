@@ -11,6 +11,12 @@ function escapeAttribute(value = '') {
     .replaceAll('>', '&gt;')
 }
 
+function formatDateValue(value = '') {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const [year, month, day] = value.split('-')
+  return `${day}.${month}.${year.slice(-2)}`
+}
+
 export function controlButton({ content, className = '', type = 'button', attributes: extraAttributes = '' }) {
   const classAttribute = className ? ` class="${className}"` : ''
   return `<button${classAttribute} type="${type}"${attributes(extraAttributes)}>${content}</button>`
@@ -53,12 +59,41 @@ export function chipControl({ label, selected = false, attributes: extraAttribut
   })
 }
 
-export function fieldControl({ id, label, placeholder, options, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false }) {
+export function fieldControl({ id, label, placeholder, options, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, dateIconContent = '', clearIconContent = '' }) {
   const validation = required ? ' required' : ''
   const error = errorMessage || 'Заполни поле'
   const extraAttributes = attributes(inputAttributes)
+  const disabled = /(^|\s)disabled(\s|$)/.test(inputAttributes)
   const classes = ['ui-field', className].filter(Boolean).join(' ')
   const safeValue = escapeAttribute(value)
+
+  if (type === 'date') {
+    const displayValue = formatDateValue(value)
+    return `
+      <div class="${classes}" data-ui-date="${id}">
+        <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
+        <span class="ui-field__control ui-field__control--date">
+          <input id="${id}" name="${id}" type="hidden" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
+          ${controlButton({
+            className: 'ui-date__value',
+            content: `<span class="${displayValue ? '' : 'is-placeholder'}" data-ui-date-value>${displayValue || placeholder}</span>`,
+            attributes: `aria-labelledby="${id}-label" aria-expanded="false" aria-controls="${id}-picker" data-ui-date-toggle="${id}"${disabled ? ' disabled' : ''}`,
+          })}
+          ${controlButton({
+            className: 'ui-date__clear',
+            content: clearIconContent,
+            attributes: `aria-label="Очистить дату" data-ui-date-clear="${id}"${displayValue && !disabled ? '' : ' hidden'}${disabled ? ' disabled' : ''}`,
+          })}
+          ${controlButton({
+            className: 'ui-date__calendar',
+            content: dateIconContent,
+            attributes: `aria-label="Открыть календарь" aria-expanded="false" aria-controls="${id}-picker" data-ui-date-toggle="${id}"${disabled ? ' disabled' : ''}`,
+          })}
+          <span class="ui-date-picker" id="${id}-picker" role="dialog" aria-label="Выбор даты" hidden></span>
+        </span>
+        <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+      </div>`
+  }
 
   if (options) {
     return `
@@ -72,7 +107,7 @@ export function fieldControl({ id, label, placeholder, options, required = true,
           ${controlButton({
             className: 'ui-select__trigger',
             content: `<span class="${value ? '' : 'is-placeholder'}">${value || placeholder}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
-            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}"`,
+            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}"${disabled ? ' disabled' : ''}`,
           })}
           <span class="ui-select__options" id="${id}-options" role="listbox" aria-labelledby="${id}-label" hidden>
             ${options.map((option) => controlButton({ className: `ui-select__option ${option === value ? 'is-selected' : ''}`, content: option, attributes: `role="option" aria-selected="${option === value}" data-ui-select-option="${id}" data-value="${escapeAttribute(option)}"` })).join('')}
@@ -82,12 +117,23 @@ export function fieldControl({ id, label, placeholder, options, required = true,
       </div>`
   }
 
+  if (multiline) {
+    return `
+      <label class="${classes}" for="${id}">
+        <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}">${label}</span>
+        <span class="ui-field__control ui-field__control--textarea">
+          <textarea id="${id}" name="${id}" placeholder="${placeholder}" data-ui-field${validation}${extraAttributes}>${safeValue}</textarea>
+        </span>
+        <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+      </label>`
+  }
+
   return `
     <label class="${classes}" for="${id}">
       <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}">${label}</span>
       <span class="ui-field__control">
         ${leadingContent}
-        <input id="${id}" name="${id}" type="text" placeholder="${placeholder}" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
+        <input id="${id}" name="${id}" type="${type}" placeholder="${placeholder}" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
       </span>
       <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
     </label>`

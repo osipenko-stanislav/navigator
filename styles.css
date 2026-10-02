@@ -364,6 +364,66 @@ input, select { caret-color: var(--purple); }
 .vacancy-filters__show { width: 100%; margin-top: 4px; }
 .vacancy-filters__reset { min-height: 40px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; }
 .vacancy-filters__reset:hover { background: var(--surface-alt); }
+.applications-panel { min-height: 714px; margin-top: 16px; padding: 32px; border-radius: 24px; background: var(--surface); }
+.applications-toolbar { position: relative; z-index: 3; display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 24px; }
+.applications-filters { display: flex; align-items: flex-start; gap: 8px; }
+.applications-filters .ui-multiselect { width: auto; gap: 0; }
+.applications-filters .ui-field__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.applications-filters .ui-multiselect__trigger { width: auto; min-height: 24px; padding: 1px 6px 1px 8px; border-radius: 12px; }
+.applications-filters .ui-multiselect__trigger .is-placeholder { color: var(--text); }
+.applications-filters .ui-multiselect__chevron { width: 14px; height: 14px; background-size: 14px; }
+.applications-filters .ui-multiselect__options { top: calc(100% + 4px); width: max-content; min-width: 100%; max-height: 280px; overflow-y: auto; }
+.applications-filters .ui-multiselect__option { width: max-content; min-width: 100%; white-space: nowrap; }
+.applications-add { display: inline-flex; min-height: 40px; align-items: center; gap: 4px; padding: 9px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.applications-add:hover { border-color: var(--border-hover); background: var(--surface-alt); }
+.applications-table-wrap { margin-top: 16px; overflow-x: auto; border-radius: 20px; background: var(--surface-alt); }
+.applications-table-stage { position: relative; width: calc(100% - 8px); min-width: 984px; margin-inline: 4px; overflow: hidden; border-radius: 16px; background: var(--surface-alt); }
+.applications-table { width: 100%; min-width: 984px; overflow: hidden; border-collapse: separate; border-spacing: 0; border-radius: 16px; table-layout: fixed; }
+.applications-table th { height: 48px; padding: 0 12px; color: var(--text-tertiary); text-align: left; font-size: 14px; line-height: 20px; font-weight: 400; }
+.applications-table th:nth-child(1) { width: 180px; }.applications-table th:nth-child(2) { width: 140px; }.applications-table th:nth-child(3) { width: 140px; }.applications-table th:nth-child(4) { width: 180px; }.applications-table th:nth-child(5) { width: 180px; }
+.applications-table tbody tr { background: var(--surface); }
+.applications-table td { height: 50px; padding: 0 12px; overflow: hidden; border-bottom: 2px solid var(--surface-alt); text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 20px; }
+.applications-table thead th:first-child { border-radius: 16px 0 0; }
+.applications-table thead th:last-child { border-radius: 0 16px 0 0; }
+.applications-table tbody tr:first-child td:first-child { border-radius: 16px 0 0; }
+.applications-table tbody tr:first-child td:last-child { border-radius: 0 16px 0 0; }
+.applications-table tbody tr:last-child td:first-child { border-radius: 0 0 0 16px; }
+.applications-table tbody tr:last-child td:last-child { border-radius: 0 0 16px; }
+.applications-table th:last-child, .applications-table td:last-child { padding-right: 60px; }
+.application-date { display: inline-flex; align-items: center; gap: 4px; }
+.application-status { display: inline-flex; padding: 1px 5px; border-radius: 4px; background: #dff3f5; font-size: 12px; line-height: 18px; }
+.application-status--1 { background: #fef0c7; }.application-status--2 { background: #eadcf8; }.application-status--3 { background: #e1e4fb; }.application-status--4 { background: #f6d8eb; }.application-status--5 { background: #e7f1d7; }.application-status--6 { background: #f8dada; }.application-status--7 { color: var(--text-secondary); background: #e2e3e5; }
+.applications-edit-rail { position: absolute; z-index: 2; top: 48px; right: 0; display: flex; width: 48px; flex-direction: column; overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: 0 5px 20px rgb(28 28 30 / 10%); }
+.application-edit { display: grid; width: 48px; height: 50px; flex: 0 0 50px; place-items: center; padding: 0; border: 0; border-bottom: 2px solid var(--surface-alt); background: var(--surface); cursor: pointer; }
+.application-edit:last-child { border-bottom: 0; }
+.application-edit:hover { background: #ececef; }
+.applications-pager { display: flex; height: 44px; align-items: center; justify-content: space-between; padding: 4px 12px; }
+.applications-pager > div { display: flex; gap: 4px; }
+.applications-page { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.applications-page:hover { background: #e2e3e5; }.applications-page.is-current { color: #fff; background: var(--accent); }
+.applications-empty { display: grid; min-height: 220px; place-items: center; color: var(--text-secondary); }
+.application-drawer { position: relative; display: flex; width: min(480px, 100%); height: 100%; flex-direction: column; padding: 4px; overflow: hidden; border-radius: 24px; background: var(--purple-pale); box-shadow: -6px 0 34px rgb(28 28 30 / 12%); animation: course-drawer-in 300ms ease-in-out both; }
+.application-drawer:focus { outline: none; }
+.application-drawer__header { min-height: 112px; padding: 28px 28px 32px; }
+.application-drawer--external .application-drawer__header { min-height: 88px; }
+.application-drawer__header h2 { max-width: 300px; margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
+.application-drawer__header p { margin: 4px 0 0; font-size: 14px; line-height: 20px; }
+.application-drawer__character { position: absolute; z-index: 0; top: -12px; right: -2px; display: block; width: 200px; height: 220px; object-fit: contain; pointer-events: none; }
+.application-drawer__header h2, .application-drawer__header p { position: relative; z-index: 1; }
+.application-drawer__close { z-index: 2; top: 8px; right: 8px; width: 40px; height: 40px; padding: 8px; border-radius: 16px; background: transparent; }
+.application-form { position: relative; z-index: 1; display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; padding: 32px 24px; border-radius: 20px; background: var(--surface); scrollbar-color: #8a8e93 rgb(36 74 127 / 6%); scrollbar-width: thin; }
+.application-form::-webkit-scrollbar { width: 8px; }
+.application-form::-webkit-scrollbar-track { border-radius: 8px; background: rgb(36 74 127 / 6%); }
+.application-form::-webkit-scrollbar-thumb { border-radius: 8px; background: #8a8e93; }
+.application-form__fields { display: flex; flex-direction: column; gap: 16px; }
+.application-form__footer { display: flex; justify-content: flex-end; padding-top: 28px; }
+.application-form .ui-field:has([data-ui-field]:disabled) { opacity: .56; }
+.application-form .ui-field__control:has([data-ui-field]:disabled) { background: var(--surface-alt); }
+.application-form .ui-field.is-open, .application-form .ui-field.is-date-open { z-index: 30; }
+.application-form .ui-select__options { max-height: 320px; overflow-y: auto; }
+.application-form .ui-field__control--textarea { height: auto; overflow: visible; }
+.application-form .ui-field__control--textarea textarea { width: 100%; height: 256px; min-height: 256px; resize: vertical; }
+.modal-backdrop.is-closing .application-drawer { animation-name: course-drawer-out; }
 .vacancy-internships { display: flex; align-items: flex-start; gap: 12px; }
 .vacancy-internships > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .vacancy-internships strong { font-size: 14px; line-height: 20px; font-weight: 500; }
@@ -635,7 +695,10 @@ input, select { caret-color: var(--purple); }
 .ui-field__control { position: relative; display: flex; align-items: center; width: 100%; height: 40px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: #fff; transition: border-color 200ms ease-in-out, box-shadow 200ms ease-in-out, background-color 200ms ease-in-out; }
 .ui-field__control:focus-within { border-color: var(--border-hover); box-shadow: none; }
 .ui-field__control input,
-.ui-field__control select { width: 100%; min-width: 0; height: 100%; padding: 0 12px; border: 0; outline: 0; color: var(--text); background: transparent; font: 400 14px/20px Inter, Arial, sans-serif; letter-spacing: 0; }
+.ui-field__control select,
+.ui-field__control textarea { width: 100%; min-width: 0; height: 100%; padding: 0 12px; border: 0; outline: 0; color: var(--text); background: transparent; font: 400 14px/20px Inter, Arial, sans-serif; letter-spacing: 0; }
+.ui-field__control--textarea { height: 220px; align-items: flex-start; }
+.ui-field__control textarea { padding-block: 8px; resize: vertical; }
 .ui-field__control input::placeholder { color: var(--text-tertiary); opacity: 1; }
 .input-search .ui-field__control { border-radius: 12px; }
 .input-search .ui-field__control > .icon { margin-left: 12px; }
@@ -654,6 +717,29 @@ input, select { caret-color: var(--purple); }
 .ui-select__option { width: 100%; min-height: 36px; padding: 8px; border: 0; border-radius: 8px; text-align: left; background: transparent; cursor: pointer; }
 .ui-select__option:hover, .ui-select__option.is-selected { background: var(--surface-alt); }
 .ui-select__option:focus-visible { outline: 2px solid var(--border-hover); outline-offset: -2px; }
+.ui-field__control--date { gap: 8px; overflow: visible; padding: 0 8px 0 12px; }
+.ui-date__value { display: flex; min-width: 0; height: 100%; flex: 1; align-items: center; padding: 0; overflow: hidden; border: 0; text-align: left; background: transparent; cursor: pointer; }
+.ui-date__value > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-date__value .is-placeholder { color: var(--text-tertiary); }
+.ui-date__clear, .ui-date__calendar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.ui-date__clear[hidden] { display: none; }
+.ui-date__clear:hover:not(:disabled), .ui-date__calendar:hover:not(:disabled) { background: var(--surface-alt); }
+.ui-date__value:focus-visible, .ui-date__clear:focus-visible, .ui-date__calendar:focus-visible { outline: 2px solid var(--border-hover); outline-offset: 1px; }
+.ui-date-picker { position: absolute; z-index: 30; top: calc(100% + 4px); right: -1px; width: 288px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 5px 20px rgb(28 28 30 / 10%); }
+.ui-date-picker[hidden] { display: none; }
+.ui-date-picker__header { display: flex; height: 24px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ui-date-picker__title { font-size: 16px; line-height: 24px; font-weight: 500; }
+.ui-date-picker__nav { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.ui-date-picker__nav:hover { background: var(--surface-alt); }
+.ui-date-picker__nav:focus-visible { outline: 2px solid var(--border-hover); outline-offset: 1px; }
+.ui-date-picker__weekdays, .ui-date-picker__days { display: grid; grid-template-columns: repeat(7, 36px); }
+.ui-date-picker__weekday { display: grid; width: 36px; height: 36px; place-items: center; color: var(--text-secondary); font-size: 14px; line-height: 20px; }
+.ui-date-picker__day { position: relative; display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 2px solid transparent; border-radius: 4px; color: var(--text); background: transparent; cursor: pointer; }
+.ui-date-picker__day:hover { background: var(--surface-alt); }
+.ui-date-picker__day.is-weekend { color: #d92d20; }
+.ui-date-picker__day.is-outside { opacity: .56; }
+.ui-date-picker__day.is-selected::after { content: ''; position: absolute; right: 10px; bottom: 3px; left: 10px; height: 1.5px; border-radius: 2px; background: currentcolor; }
+.ui-date-picker__day:focus-visible { border-color: var(--border-hover); outline: 0; }
 .ui-field__error { display: none; color: #b42318; font-size: 14px; line-height: 20px; }
 .ui-field--error .ui-field__control { border-color: #f04438; background: #fee4e2; box-shadow: none; }
 .ui-field--error .ui-field__error { display: block; }
@@ -940,6 +1026,9 @@ input, select { caret-color: var(--purple); }
   .vacancy-detail__facts > div { grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
   .vacancy-detail__benefits { grid-template-columns: 1fr; }
   .vacancy-filters { padding: 20px; }
+  .applications-panel { padding: 20px 16px; }
+  .applications-toolbar { align-items: flex-start; flex-direction: column; }
+  .applications-filters { flex-wrap: wrap; }
   .vacancy-pagination { flex-wrap: wrap; padding-inline: 0; }
   .vacancy-pagination > span { width: 100%; margin: 4px 0 0; }
   .planner { padding: 24px 16px 20px; }

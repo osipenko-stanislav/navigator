@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, controlButton, fieldControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=10'
+import { checkboxControl, chipControl, controlButton, fieldControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=13'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -21,11 +21,13 @@ const PENDING_GOAL_KEY = 'cpk:pending-goal'
 const STUDY_PROGRESS_KEY = 'cpk:study-goal-progress'
 const INDUSTRY_PROGRESS_KEY = 'cpk:industry-goal-progress'
 const VACANCY_STATE_KEY = 'cpk:industry-vacancies'
+const APPLICATIONS_STORAGE_KEY = 'cpk:industry-applications'
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
 const PLANNER_COURSE_TARGET = 24
 const PLANNER_CREDIT_TARGET = 60
 const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', 'Более 200 000']
+const APPLICATION_STATUSES = ['Новый', 'На рассмотрении', 'Интервью', 'Тестовое', 'Тех. собес', 'Оффер', 'Отказ', 'В архиве']
 
 const studyStages = [
   {
@@ -222,6 +224,65 @@ const vacancies = vacancySeeds.map(([brandId, title], index) => {
   }
 })
 
+function normalizeApplicationSalary(value = '') {
+  if (!value || value === '—') return ''
+  if (CAREER_SALARY_OPTIONS.includes(value)) return value
+  const numbers = [...String(value).matchAll(/[\d\s ]+/g)]
+    .map((match) => Number(match[0].replace(/[\s ]/g, '')))
+    .filter(Number.isFinite)
+  const amount = numbers.length > 1 ? Math.max(...numbers) : numbers[0]
+  if (!amount) return ''
+  if (amount < 50000) return CAREER_SALARY_OPTIONS[0]
+  if (amount <= 100000) return CAREER_SALARY_OPTIONS[1]
+  if (amount <= 200000) return CAREER_SALARY_OPTIONS[2]
+  return CAREER_SALARY_OPTIONS[3]
+}
+
+const defaultApplications = [
+  ['Яндекс', 'ML Engineer Intern', CAREER_SALARY_OPTIONS[1], 'Новый'],
+  ['Т-Банк', 'Data Analyst', CAREER_SALARY_OPTIONS[2], 'Оффер'],
+  ['Ozon Tech', 'Backend Developer', '—', 'Интервью'],
+  ['Яндекс', 'Research ML', CAREER_SALARY_OPTIONS[1], 'Оффер'],
+  ['Т-Банк', 'Product Analyst', CAREER_SALARY_OPTIONS[2], 'Отказ'],
+  ['Ozon Tech', 'UX Researcher', CAREER_SALARY_OPTIONS[1], 'На рассмотрении'],
+  ['Яндекс', 'Frontend Developer', '—', 'Отказ'],
+  ['Т-Банк', 'QA Engineer', CAREER_SALARY_OPTIONS[1], 'Тестовое'],
+  ['Ozon Tech', 'Product Manager', CAREER_SALARY_OPTIONS[2], 'Тех. собес'],
+  ['Яндекс', 'Data Engineer', '—', 'Новый'],
+  ['Lamoda Tech', 'Продуктовый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', '2026-06-10'],
+  ['Сбер', 'Frontend-разработчик', CAREER_SALARY_OPTIONS[2], 'Интервью', '2026-06-09'],
+  ['Альфа-Банк', 'Java-разработчик', CAREER_SALARY_OPTIONS[2], 'Тестовое', '2026-06-08'],
+  ['МТС', 'Data Engineer', CAREER_SALARY_OPTIONS[1], 'Тех. собес', '2026-06-07'],
+  ['Циан', 'UX/UI-дизайнер', CAREER_SALARY_OPTIONS[1], 'Новый', '2026-06-06'],
+  ['VK Tech', 'Python-разработчик', CAREER_SALARY_OPTIONS[2], 'Оффер', '2026-06-05'],
+  ['Райффайзен Банк', 'Бизнес-аналитик', CAREER_SALARY_OPTIONS[1], 'В архиве', '2026-06-04'],
+  ['Туту', 'Маркетинговый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', '2026-06-03'],
+  ['СДЭК', 'QA-инженер', CAREER_SALARY_OPTIONS[1], 'Отказ', '2026-06-02'],
+  ['Лемана ПРО', 'BI-аналитик', CAREER_SALARY_OPTIONS[2], 'Интервью', '2026-06-01'],
+  ['Билайн', 'Инженер по тестированию', CAREER_SALARY_OPTIONS[1], 'Тестовое', '2026-05-31'],
+  ['Яндекс Пэй', 'Системный аналитик', CAREER_SALARY_OPTIONS[2], 'Новый', '2026-05-30'],
+].map(([company, position, salary, status, date = '2026-06-11'], index) => ({
+  id: `demo-${index + 1}`, internal: index < 3, vacancyId: null, company, date, status, position, salary,
+  source: index < 3 ? 'ЦУ' : 'Внешний источник', link: '', contact: '', notes: '',
+}))
+
+function getApplications() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(APPLICATIONS_STORAGE_KEY) || 'null')
+    const source = Array.isArray(saved)
+      ? [...saved, ...defaultApplications.filter((item) => !saved.some((savedItem) => savedItem.id === item.id))]
+      : defaultApplications
+    return source
+      .map((item) => ({ ...item, salary: normalizeApplicationSalary(item.salary) }))
+  } catch {
+    return defaultApplications
+  }
+}
+
+function saveApplications() {
+  try { window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(applications)) } catch { /* Keep the session interactive. */ }
+}
+
 const normalizeCourseTitle = (value = '') => value
   .toLocaleLowerCase('ru')
   .replaceAll('ё', 'е')
@@ -349,6 +410,11 @@ const VACANCIES_PER_PAGE = 10
 let vacancyDirectionOpen = false
 let vacancySelectedDirections = new Set()
 let selectedVacancyId = new URLSearchParams(window.location.search).get('id')
+let applications = getApplications()
+let applicationFilters = { company: new Set(), status: new Set(), position: new Set(), salary: new Set() }
+let applicationFilterOpen = null
+let applicationPage = 1
+let editingApplicationId = null
 
 function getVacancyState() {
   try {
@@ -1411,6 +1477,113 @@ function vacanciesTemplate() {
     </div>`
 }
 
+function applicationFilterControl(id, label, values) {
+  return multiSelectControl({
+    id: `application-${id}`,
+    label,
+    placeholder: label,
+    options: values.map((value) => ({ label: value, value })),
+    selected: applicationFilters[id],
+    open: applicationFilterOpen === id,
+    checkContent: icon('check-small.svg', 20),
+    attributes: `data-application-filter-toggle="${id}"`,
+  })
+}
+
+function formatApplicationDate(value) {
+  if (!value) return '—'
+  const [year, month, day] = value.split('-')
+  return `${day}.${month}.${year.slice(-2)}`
+}
+
+function applicationsTemplate() {
+  const filterValues = {
+    company: [...new Set(applications.map((item) => item.company))],
+    status: APPLICATION_STATUSES,
+    position: [...new Set(applications.map((item) => item.position))],
+    salary: CAREER_SALARY_OPTIONS,
+  }
+  const filtered = applications.filter((item) => Object.entries(applicationFilters)
+    .every(([key, selected]) => !selected.size || selected.has(item[key])))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 10))
+  applicationPage = Math.min(applicationPage, pageCount)
+  const rows = filtered.slice((applicationPage - 1) * 10, applicationPage * 10)
+  const statusClass = (status) => `application-status--${APPLICATION_STATUSES.indexOf(status)}`
+
+  return `<section class="applications-panel" aria-labelledby="applications-title">
+    <h2 class="visually-hidden" id="applications-title">Отклики</h2>
+    <div class="applications-toolbar">
+      <div class="applications-filters">
+        ${applicationFilterControl('company', 'Компания', filterValues.company)}
+        ${applicationFilterControl('status', 'Статус', filterValues.status)}
+        ${applicationFilterControl('position', 'Должность', filterValues.position)}
+        ${applicationFilterControl('salary', 'Зарплата', filterValues.salary)}
+      </div>
+      ${controlButton({ className: 'applications-add', content: `${icon('planner-plus.svg', 20)}<span>Внешний отклик</span>`, attributes: 'data-application-add' })}
+    </div>
+    <div class="applications-table-wrap">
+      <div class="applications-table-stage">
+        <table class="applications-table">
+          <thead><tr><th>Компания</th><th>Дата отклика</th><th>Статус</th><th>Должность</th><th>Зарплата</th><th>Заметки</th></tr></thead>
+          <tbody>${rows.map((item) => `<tr>
+            <td>${item.company}</td><td><span class="application-date">${icon('application-calendar.svg', 18)}${formatApplicationDate(item.date)}</span></td><td><span class="application-status ${statusClass(item.status)}">${item.status}</span></td>
+            <td>${item.position}</td><td>${normalizeApplicationSalary(item.salary) || '—'}</td><td>${item.notes || '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+        ${rows.length ? `<div class="applications-edit-rail" aria-label="Действия с откликами">${rows.map((item) => controlButton({ className: 'application-edit', content: icon('edit.svg', 20), attributes: `aria-label="Редактировать отклик ${item.company}" data-application-edit="${item.id}"` })).join('')}</div>` : ''}
+      </div>
+      ${rows.length ? '' : '<div class="applications-empty">По выбранным фильтрам откликов нет</div>'}
+      <div class="applications-pager">
+        <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => controlButton({ className: `applications-page ${page === applicationPage ? 'is-current' : ''}`, content: String(page), attributes: `data-application-page="${page}" ${page === applicationPage ? 'aria-current="page"' : ''}` })).join('')}</div>
+        <span>${filtered.length ? `${(applicationPage - 1) * 10 + 1}–${Math.min(applicationPage * 10, filtered.length)}` : '0'} из ${filtered.length}</span>
+      </div>
+    </div>
+  </section>`
+}
+
+function renderApplicationsPanel({ focusSelector } = {}) {
+  const panel = root.querySelector('[data-study-panel="applications"]')
+  if (!panel) return
+  panel.innerHTML = applicationsTemplate()
+  if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
+}
+
+function openApplicationDrawer(application = null) {
+  const item = application || {
+    id: `external-${Date.now()}`, internal: false, company: '', date: new Date().toISOString().slice(0, 10), status: 'Новый',
+    position: '', salary: '', source: 'Внешний источник', link: '', contact: '', notes: '',
+  }
+  editingApplicationId = application?.id || null
+  previouslyFocused = document.activeElement
+  const locked = item.internal ? 'disabled' : ''
+  document.querySelector('#modal-root').innerHTML = `<div class="modal-backdrop modal-backdrop--sheet" role="presentation">
+    <aside class="application-drawer application-drawer--${item.internal ? 'internal' : 'external'}" role="dialog" aria-modal="true" aria-labelledby="application-drawer-title" tabindex="-1">
+      ${controlButton({ className: 'goal-dialog__close application-drawer__close', content: icon('close.svg', 24), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+      <img class="application-drawer__character" src="${ASSET}application-drawer-character.png" width="198" height="208" alt="">
+      <header class="application-drawer__header"><h2 id="application-drawer-title">${item.internal ? item.company : 'Внешняя вакансия'}</h2>${item.internal ? `<p>${item.position}</p>` : ''}</header>
+      <form class="application-form" data-application-form novalidate>
+        <div class="application-form__fields">
+          ${fieldControl({ id: 'application-company', label: 'Компания', placeholder: 'Название компании', value: item.company, inputAttributes: locked })}
+          ${fieldControl({ id: 'application-date', label: 'Дата отклика', placeholder: 'Выбери дату', value: item.date, type: 'date', inputAttributes: item.internal ? 'disabled' : '', dateIconContent: icon('application-calendar-picker.svg', 24), clearIconContent: icon('application-date-clear.svg', 24) })}
+          ${fieldControl({ id: 'application-status', label: 'Статус', placeholder: 'Выбери статус', options: APPLICATION_STATUSES, value: item.status })}
+          ${fieldControl({ id: 'application-position', label: 'Должность', placeholder: 'Название должности', value: item.position, inputAttributes: locked })}
+          ${item.internal
+            ? fieldControl({ id: 'application-salary', label: 'Зарплата', placeholder: 'Не указана', options: CAREER_SALARY_OPTIONS, value: normalizeApplicationSalary(item.salary), required: false, inputAttributes: locked })
+            : fieldControl({ id: 'application-salary', label: 'Зарплата', placeholder: 'Выбери зарплату', options: CAREER_SALARY_OPTIONS, value: normalizeApplicationSalary(item.salary), required: false })}
+          ${item.internal
+            ? fieldControl({ id: 'application-source', label: 'Источник вакансии', placeholder: '', options: ['ЦУ'], value: item.source, inputAttributes: 'disabled', required: false })
+            : fieldControl({ id: 'application-link', label: 'Ссылка на вакансию', placeholder: 'https://', value: item.link, required: false })}
+          ${fieldControl({ id: 'application-contact', label: 'Контакт нанимающего', placeholder: '@username или ссылка', value: item.contact, required: false })}
+          ${fieldControl({ id: 'application-notes', label: 'Комментарий', placeholder: 'Оставь свой комментарий', value: item.notes, required: false, multiline: true })}
+        </div>
+        <div class="application-form__footer">${controlButton({ className: 'flat-button flat-button--primary', content: 'Сохранить', type: 'submit' })}</div>
+      </form>
+    </aside>
+  </div>`
+  setModalState(true)
+  document.querySelector('.application-drawer').focus()
+}
+
 function industryGoalTemplate() {
   const progress = getIndustryProgress()
   const summary = getIndustryProgressSummary(progress)
@@ -1474,7 +1647,7 @@ function industryGoalTemplate() {
           ${vacanciesTemplate()}
         </div>
         <div id="study-panel-applications" role="tabpanel" aria-labelledby="study-tab-applications" data-study-panel="applications" hidden>
-          ${studyTabPlaceholder('applications', 'Отклики', 'Здесь можно будет отслеживать отклики и этапы отбора.')}
+          ${applicationsTemplate()}
         </div>
         <div id="study-panel-portfolio" role="tabpanel" aria-labelledby="study-tab-portfolio" data-study-panel="portfolio" hidden>
           ${studyTabPlaceholder('portfolio', 'Резюме и портфолио', 'Здесь появятся материалы для подготовки резюме и портфолио.')}
@@ -2034,7 +2207,7 @@ function updateIndustryProgress() {
 
 function restartScenario() {
   try {
-    ;[SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, PLANNER_STORAGE_KEY]
+    ;[SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PLANNER_STORAGE_KEY]
       .forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // The scenario still restarts in memory when storage is unavailable.
@@ -2043,6 +2216,7 @@ function restartScenario() {
   plannerState = createDefaultPlannerState()
   plannerPickerSemester = null
   vacancyState = { favorites: new Set(), applied: new Set() }
+  applications = defaultApplications.map((item) => ({ ...item }))
   vacancySearch = ''
   vacancyFavoritesOnly = false
   vacancyFilters.clear()
@@ -2076,6 +2250,67 @@ function closeAllSingleSelects(except = null) {
   })
 }
 
+const APPLICATION_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+const APPLICATION_WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
+
+function parseApplicationDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '')
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null
+}
+
+function applicationDateValue(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function renderApplicationDatePicker(field) {
+  const input = field.querySelector('[data-ui-field]')
+  const selected = parseApplicationDate(input.value)
+  const initial = selected || new Date()
+  const [cursorYear, cursorMonth] = (field.dataset.uiDateMonth || `${initial.getFullYear()}-${initial.getMonth()}`)
+    .split('-').map(Number)
+  const first = new Date(cursorYear, cursorMonth, 1)
+  const offset = (first.getDay() + 6) % 7
+  const start = new Date(cursorYear, cursorMonth, 1 - offset)
+  const days = Array.from({ length: 42 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index))
+  const picker = field.querySelector('.ui-date-picker')
+
+  field.dataset.uiDateMonth = `${cursorYear}-${cursorMonth}`
+  picker.innerHTML = `
+    <span class="ui-date-picker__header">
+      ${controlButton({ className: 'ui-date-picker__nav', content: icon('application-chevron-left.svg', 24), attributes: 'aria-label="Предыдущий месяц" data-ui-date-month="-1"' })}
+      <span class="ui-date-picker__title">${APPLICATION_MONTHS[cursorMonth]} ${cursorYear}</span>
+      ${controlButton({ className: 'ui-date-picker__nav', content: icon('application-chevron-right.svg', 24), attributes: 'aria-label="Следующий месяц" data-ui-date-month="1"' })}
+    </span>
+    <span class="ui-date-picker__weekdays" aria-hidden="true">${APPLICATION_WEEKDAYS.map((day) => `<span class="ui-date-picker__weekday">${day}</span>`).join('')}</span>
+    <span class="ui-date-picker__days">${days.map((date) => {
+      const value = applicationDateValue(date)
+      const outside = date.getMonth() !== cursorMonth
+      const weekend = date.getDay() === 0 || date.getDay() === 6
+      const isSelected = value === input.value
+      return controlButton({
+        className: `ui-date-picker__day ${outside ? 'is-outside' : ''} ${weekend ? 'is-weekend' : ''} ${isSelected ? 'is-selected' : ''}`.replace(/\s+/g, ' ').trim(),
+        content: String(date.getDate()),
+        attributes: `data-ui-date-day="${value}" aria-label="${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}"${isSelected ? ' aria-current="date"' : ''}`,
+      })
+    }).join('')}</span>`
+}
+
+function closeApplicationDatePicker(field) {
+  field.classList.remove('is-date-open')
+  field.querySelectorAll('[data-ui-date-toggle]').forEach((button) => button.setAttribute('aria-expanded', 'false'))
+  const picker = field.querySelector('.ui-date-picker')
+  if (picker) picker.hidden = true
+}
+
+function closeAllApplicationDatePickers(except = null) {
+  root.querySelectorAll('[data-ui-date].is-date-open').forEach((field) => {
+    if (field !== except) closeApplicationDatePicker(field)
+  })
+}
+
 function closeVacancyDirectionSelect() {
   if (!vacancyDirectionOpen) return
   vacancyDirectionOpen = false
@@ -2098,6 +2333,60 @@ root.addEventListener('click', (event) => {
 
   const clickedSelect = event.target.closest('[data-ui-select]')
   closeAllSingleSelects(clickedSelect)
+
+  const clickedDate = event.target.closest('[data-ui-date]')
+  closeAllApplicationDatePickers(clickedDate)
+
+  const dateClear = event.target.closest('[data-ui-date-clear]')
+  if (dateClear) {
+    const field = dateClear.closest('[data-ui-date]')
+    const input = field.querySelector('[data-ui-field]')
+    input.value = ''
+    field.querySelector('[data-ui-date-value]').textContent = 'Выбери дату'
+    field.querySelector('[data-ui-date-value]').classList.add('is-placeholder')
+    dateClear.hidden = true
+    closeApplicationDatePicker(field)
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    field.querySelector('[data-ui-date-toggle]').focus()
+    return
+  }
+
+  const dateMonth = event.target.closest('[data-ui-date-month]')
+  if (dateMonth) {
+    const field = dateMonth.closest('[data-ui-date]')
+    const [year, month] = field.dataset.uiDateMonth.split('-').map(Number)
+    const next = new Date(year, month + Number(dateMonth.dataset.uiDateMonth), 1)
+    field.dataset.uiDateMonth = `${next.getFullYear()}-${next.getMonth()}`
+    renderApplicationDatePicker(field)
+    field.querySelector(`[data-ui-date-month="${dateMonth.dataset.uiDateMonth}"]`)?.focus()
+    return
+  }
+
+  const dateDay = event.target.closest('[data-ui-date-day]')
+  if (dateDay) {
+    const field = dateDay.closest('[data-ui-date]')
+    const input = field.querySelector('[data-ui-field]')
+    input.value = dateDay.dataset.uiDateDay
+    field.querySelector('[data-ui-date-value]').textContent = formatApplicationDate(input.value)
+    field.querySelector('[data-ui-date-value]').classList.remove('is-placeholder')
+    field.querySelector('[data-ui-date-clear]').hidden = false
+    closeApplicationDatePicker(field)
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    field.querySelector('[data-ui-date-toggle]').focus()
+    return
+  }
+
+  const dateToggle = event.target.closest('[data-ui-date-toggle]')
+  if (dateToggle) {
+    const field = dateToggle.closest('[data-ui-date]')
+    const open = !field.classList.contains('is-date-open')
+    field.classList.toggle('is-date-open', open)
+    field.querySelectorAll('[data-ui-date-toggle]').forEach((button) => button.setAttribute('aria-expanded', String(open)))
+    const picker = field.querySelector('.ui-date-picker')
+    picker.hidden = !open
+    if (open) renderApplicationDatePicker(field)
+    return
+  }
 
   const selectToggle = event.target.closest('[data-ui-select-toggle]')
   if (selectToggle) {
@@ -2146,7 +2435,34 @@ root.addEventListener('click', (event) => {
   const studyTab = event.target.closest('[data-study-tab]')
   if (studyTab) {
     vacancyDirectionOpen = false
+    applicationFilterOpen = null
     activateStudyTab(studyTab)
+  }
+
+  const applicationFilterToggle = event.target.closest('[data-application-filter-toggle]')
+  if (applicationFilterToggle) {
+    const filter = applicationFilterToggle.dataset.applicationFilterToggle
+    applicationFilterOpen = applicationFilterOpen === filter ? null : filter
+    renderApplicationsPanel({ focusSelector: `[data-application-filter-toggle="${filter}"]` })
+    return
+  }
+
+  if (event.target.closest('[data-application-add]')) {
+    openApplicationDrawer()
+    return
+  }
+
+  const applicationEdit = event.target.closest('[data-application-edit]')
+  if (applicationEdit) {
+    openApplicationDrawer(applications.find((item) => item.id === applicationEdit.dataset.applicationEdit))
+    return
+  }
+
+  const applicationPageButton = event.target.closest('[data-application-page]')
+  if (applicationPageButton) {
+    applicationPage = Number(applicationPageButton.dataset.applicationPage)
+    renderApplicationsPanel({ focusSelector: `[data-application-page="${applicationPage}"]` })
+    return
   }
 
   if (event.target.closest('[data-vacancy-direction-toggle]')) {
@@ -2174,9 +2490,21 @@ root.addEventListener('click', (event) => {
   const vacancyApply = event.target.closest('[data-vacancy-apply]')
   if (vacancyApply) {
     const id = vacancyApply.dataset.vacancyApply
-    if (vacancyState.applied.has(id)) vacancyState.applied.delete(id)
-    else vacancyState.applied.add(id)
+    const alreadyApplied = vacancyState.applied.has(id)
+    if (alreadyApplied) {
+      vacancyState.applied.delete(id)
+      applications = applications.filter((item) => item.vacancyId !== id)
+    } else {
+      vacancyState.applied.add(id)
+      const vacancy = vacancies.find((item) => item.id === id)
+      if (vacancy && !applications.some((item) => item.vacancyId === id)) applications.unshift({
+        id: `internal-${id}`, internal: true, vacancyId: id, company: vacancy.company,
+        date: new Date().toISOString().slice(0, 10), status: 'Новый', position: vacancy.title,
+        salary: normalizeApplicationSalary(vacancy.salary), source: 'ЦУ', link: '', contact: '', notes: '',
+      })
+    }
     saveVacancyState()
+    saveApplications()
     if (getScreenFromLocation() === 'vacancy') renderScreen('vacancy', { animate: false, historyMode: 'none' })
     else renderVacanciesPanel({ focusSelector: `[data-vacancy-apply="${id}"]` })
   }
@@ -2456,7 +2784,17 @@ root.addEventListener('click', (event) => {
 
 document.addEventListener('click', (event) => {
   if (!event.target.closest('[data-ui-select]')) closeAllSingleSelects()
+  if (!event.target.closest('[data-ui-date]')) closeAllApplicationDatePickers()
   if (!event.target.closest('[data-ui-multiselect]')) closeVacancyDirectionSelect()
+  if (!event.target.closest('[data-application-filter-toggle], [data-ui-multiselect^="application-"]') && applicationFilterOpen) {
+    applicationFilterOpen = null
+    root.querySelectorAll('[data-ui-multiselect^="application-"]').forEach((field) => {
+      field.classList.remove('is-open')
+      field.querySelector('.ui-multiselect__trigger')?.setAttribute('aria-expanded', 'false')
+      const options = field.querySelector('.ui-multiselect__options')
+      if (options) options.hidden = true
+    })
+  }
 })
 
 root.addEventListener('change', (event) => {
@@ -2473,6 +2811,15 @@ root.addEventListener('change', (event) => {
     vacancyPage = 1
     vacancyDirectionOpen = true
     renderVacanciesPanel({ focusSelector: `[data-ui-multiselect-option="vacancy-role"][value="${event.target.value}"]` })
+  }
+
+  if (event.target.matches('[data-ui-multiselect-option^="application-"]')) {
+    const filter = event.target.dataset.uiMultiselectOption.replace('application-', '')
+    if (event.target.checked) applicationFilters[filter].add(event.target.value)
+    else applicationFilters[filter].delete(event.target.value)
+    applicationFilterOpen = filter
+    applicationPage = 1
+    renderApplicationsPanel({ focusSelector: `[data-ui-multiselect-option="application-${filter}"][value="${event.target.value}"]` })
   }
 
   if (event.target.matches('[data-planner-completed]')) {
@@ -2563,10 +2910,43 @@ function clearWorkFieldValidation(field) {
 
 function focusWorkField(field) {
   const selectTrigger = field.closest('[data-ui-select]')?.querySelector('[data-ui-select-toggle]')
-  ;(selectTrigger || field).focus()
+  const dateTrigger = field.closest('[data-ui-date]')?.querySelector('[data-ui-date-toggle]')
+  ;(selectTrigger || dateTrigger || field).focus()
 }
 
 root.addEventListener('submit', (event) => {
+  if (event.target.matches('[data-application-form]')) {
+    event.preventDefault()
+    const fields = [...event.target.querySelectorAll('[data-ui-field]')]
+    const firstInvalid = fields.find((field) => !validateWorkField(field))
+    if (firstInvalid) {
+      focusWorkField(firstInvalid)
+      return
+    }
+    const data = new FormData(event.target)
+    const existing = applications.find((item) => item.id === editingApplicationId)
+    const application = {
+      ...(existing || {}),
+      id: existing?.id || `external-${Date.now()}`,
+      internal: Boolean(existing?.internal),
+      vacancyId: existing?.vacancyId || null,
+      company: existing?.internal ? existing.company : data.get('application-company'),
+      date: existing?.internal ? existing.date : data.get('application-date'),
+      status: data.get('application-status'),
+      position: existing?.internal ? existing.position : data.get('application-position'),
+      salary: existing?.internal ? normalizeApplicationSalary(existing.salary) : normalizeApplicationSalary(data.get('application-salary')),
+      source: existing?.internal ? existing.source : 'Внешний источник',
+      link: existing?.internal ? existing.link : data.get('application-link'),
+      contact: data.get('application-contact'),
+      notes: data.get('application-notes'),
+    }
+    if (existing) applications = applications.map((item) => item.id === existing.id ? application : item)
+    else applications.unshift(application)
+    saveApplications()
+    closeDialog(() => renderApplicationsPanel({ focusSelector: `[data-application-edit="${application.id}"]` }))
+    return
+  }
+
   if (event.target.matches('[data-planner-trajectory-form]')) {
     event.preventDefault()
     const fields = [...event.target.querySelectorAll('[data-ui-field]')]
@@ -2616,6 +2996,18 @@ document.addEventListener('keydown', (event) => {
   const dialog = document.querySelector('[aria-modal="true"]')
   if (!dialog) return
   if (event.key === 'Escape') {
+    const openDatePicker = dialog.querySelector('[data-ui-date].is-date-open')
+    if (openDatePicker) {
+      closeApplicationDatePicker(openDatePicker)
+      openDatePicker.querySelector('[data-ui-date-toggle]')?.focus()
+      return
+    }
+    const openSelect = dialog.querySelector('[data-ui-select].is-open')
+    if (openSelect) {
+      closeSingleSelect(openSelect)
+      openSelect.querySelector('[data-ui-select-toggle]')?.focus()
+      return
+    }
     closeDialog()
     return
   }
