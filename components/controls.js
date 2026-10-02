@@ -149,7 +149,7 @@ export function tabControl({ id, label, active = false }) {
 
 export function multiSelectControl({ id, label, placeholder, options, selected = new Set(), open = false, checkContent = '', attributes: extraAttributes = '' }) {
   const selectedLabels = options.filter((option) => selected.has(option.value)).map((option) => option.label)
-  const value = selectedLabels.length ? selectedLabels.join(', ') : placeholder
+  const value = selectedLabels.length ? `${label}: ${selectedLabels.join(', ')}` : placeholder
 
   return `
     <div class="ui-multiselect ${open ? 'is-open' : ''}" data-ui-multiselect="${id}">
