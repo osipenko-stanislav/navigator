@@ -1464,15 +1464,6 @@ function vacancyDetailTemplate() {
 
 function vacanciesTemplate() {
   const query = vacancySearch.trim().toLocaleLowerCase('ru')
-  const filtered = vacancies.filter((vacancy) => {
-    const searchable = `${vacancy.title} ${vacancy.company} ${vacancy.description}`.toLocaleLowerCase('ru')
-    const facets = new Set([...vacancy.tags, vacancy.level, vacancy.isFresh ? 'Свежие' : '', vacancy.partner ? 'Партнёры ЦУ' : ''])
-    return (!query || searchable.includes(query))
-      && (!vacancySelectedDirections.size || vacancySelectedDirections.has(vacancy.direction))
-      && (!vacancyFavoritesOnly || vacancyState.favorites.has(vacancy.id))
-      && (!vacancyFilters.size || [...vacancyFilters].every((filter) => facets.has(filter)))
-      && (vacancyInternships || !vacancy.tags.includes('Стажировка'))
-  })
   const filterGroups = [
     ['Вакансии', ['Свежие', 'Партнёры ЦУ']],
     ['Уровень', ['Бакалавриат', 'Магистратура']],
@@ -1480,6 +1471,18 @@ function vacanciesTemplate() {
     ['Формат', ['Удалённо', 'Гибрид', 'Офис']],
     ['Тип занятости', [['Полная', 'Полная занятость'], ['Частичная', 'Частичная занятость']]],
   ]
+  const selectedByGroup = filterGroups.map(([, items]) => items
+    .map((item) => Array.isArray(item) ? item[1] : item)
+    .filter((value) => vacancyFilters.has(value)))
+  const filtered = vacancies.filter((vacancy) => {
+    const searchable = `${vacancy.title} ${vacancy.company} ${vacancy.description}`.toLocaleLowerCase('ru')
+    const facets = new Set([...vacancy.tags, vacancy.level, vacancy.isFresh ? 'Свежие' : '', vacancy.partner ? 'Партнёры ЦУ' : ''])
+    return (!query || searchable.includes(query))
+      && (!vacancySelectedDirections.size || vacancySelectedDirections.has(vacancy.direction))
+      && (!vacancyFavoritesOnly || vacancyState.favorites.has(vacancy.id))
+      && selectedByGroup.every((selected) => !selected.length || selected.some((filter) => facets.has(filter)))
+      && (vacancyInternships || !vacancy.tags.includes('Стажировка'))
+  })
   const pageCount = Math.max(1, Math.ceil(filtered.length / VACANCIES_PER_PAGE))
   vacancyPage = Math.min(vacancyPage, pageCount)
   const pageItems = filtered.slice((vacancyPage - 1) * VACANCIES_PER_PAGE, vacancyPage * VACANCIES_PER_PAGE)
