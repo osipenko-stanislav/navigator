@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, controlButton, fieldControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=14'
+import { checkboxControl, chipControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=16'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -22,6 +22,11 @@ const STUDY_PROGRESS_KEY = 'cpk:study-goal-progress'
 const INDUSTRY_PROGRESS_KEY = 'cpk:industry-goal-progress'
 const VACANCY_STATE_KEY = 'cpk:industry-vacancies'
 const APPLICATIONS_STORAGE_KEY = 'cpk:industry-applications'
+const PORTFOLIO_PROFILES_STORAGE_KEY = 'cpk:industry-portfolio-profiles'
+const GOAL_FORM_VALUES_KEY = 'cpk:goal-form-values'
+const PORTFOLIO_PROFILE_TONES = ['sure-blue', 'sure-pink', 'optimistic-t-yellow', 'care-tiny', 'care-violet', 'expert-blue', 'expert-orange']
+const GOALS_WITH_JOB_EXPECTATIONS_STEP = new Set(['first-job', 'freelance', 'change-company', 'change-specialty'])
+const SHOW_GOAL_INFO_DIALOG = false
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
 const PLANNER_COURSE_TARGET = 24
@@ -283,6 +288,81 @@ function saveApplications() {
   try { window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(applications)) } catch { /* Keep the session interactive. */ }
 }
 
+function getPortfolioProfiles() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PORTFOLIO_PROFILES_STORAGE_KEY) || '[]')
+    if (!Array.isArray(saved)) return []
+    let primaryFound = false
+    const profiles = saved
+      .filter((profile) => profile?.id && typeof profile.name === 'string')
+      .map((profile, index) => {
+        const primary = Boolean(profile.primary) && !primaryFound
+        if (primary) primaryFound = true
+        return {
+          id: String(profile.id),
+          name: profile.name,
+          description: typeof profile.description === 'string' ? profile.description : '',
+          resumeLink: typeof profile.resumeLink === 'string' ? profile.resumeLink : '',
+          resumeFile: profile.resumeFile?.name ? profile.resumeFile : null,
+          portfolioLink: typeof profile.portfolioLink === 'string' ? profile.portfolioLink : '',
+          portfolioFile: profile.portfolioFile?.name ? profile.portfolioFile : null,
+          tone: PORTFOLIO_PROFILE_TONES.includes(profile.tone) ? profile.tone : PORTFOLIO_PROFILE_TONES[index % PORTFOLIO_PROFILE_TONES.length],
+          primary,
+          createdAt: Number(profile.createdAt) || Date.now(),
+        }
+      })
+    if (profiles.length === 1) profiles[0].primary = true
+    return profiles
+  } catch {
+    return []
+  }
+}
+
+function savePortfolioProfiles() {
+  try { window.localStorage.setItem(PORTFOLIO_PROFILES_STORAGE_KEY, JSON.stringify(portfolioProfiles)) } catch { /* Keep the session interactive. */ }
+}
+
+function getGoalFormValues(goalId = getPendingGoal()?.id) {
+  if (!goalId) return {}
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
+    return saved && typeof saved === 'object' ? saved[goalId] || {} : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveGoalFormValues(form) {
+  const goalId = getPendingGoal()?.id
+  if (!goalId) return
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
+    const current = saved && typeof saved === 'object' ? saved : {}
+    const previous = current[goalId] || {}
+    const firstStep = form.querySelector('#company')
+    const values = firstStep ? {
+      ...previous,
+      noWork: Boolean(form.querySelector('[data-no-work]')?.checked),
+      company: form.querySelector('#company')?.value || '',
+      specialty: form.querySelector('#specialty')?.value || '',
+      grade: form.querySelector('#grade')?.value || '',
+      salary: form.querySelector('#salary')?.value || '',
+    } : {
+      ...previous,
+      noExpectations: Boolean(form.querySelector('[data-no-expectations]')?.checked),
+      desiredCompany: form.querySelector('#desired-company')?.value || '',
+      desiredSpecialty: form.querySelector('#desired-specialty')?.value || '',
+      desiredGrade: form.querySelector('#desired-grade')?.value || '',
+      desiredSalary: form.querySelector('#desired-salary')?.value || '',
+    }
+    current[goalId] = values
+    window.localStorage.setItem(GOAL_FORM_VALUES_KEY, JSON.stringify(current))
+  } catch {
+    // Form editing still works for the current visit when storage is unavailable.
+  }
+}
+
 const normalizeCourseTitle = (value = '') => value
   .toLocaleLowerCase('ru')
   .replaceAll('ё', 'е')
@@ -425,6 +505,11 @@ let applicationFilters = { company: new Set(), status: new Set(), position: new 
 let applicationFilterOpen = null
 let applicationPage = 1
 let editingApplicationId = null
+let portfolioProfiles = getPortfolioProfiles()
+let editingPortfolioProfileId = new URLSearchParams(window.location.search).get('id')
+let portfolioDraftFiles = { resume: undefined, portfolio: undefined }
+let portfolioDraftFileObjects = { resume: null, portfolio: null }
+const portfolioFileObjects = new Map()
 
 function getVacancyState() {
   try {
@@ -566,6 +651,19 @@ function setPendingGoal(goal) {
   if (goal) window.localStorage.setItem(PENDING_GOAL_KEY, goal.id)
 }
 
+function getPendingGoal() {
+  try {
+    const pendingId = window.localStorage.getItem(PENDING_GOAL_KEY)
+    return goals.find((goal) => goal.id === pendingId) || null
+  } catch {
+    return null
+  }
+}
+
+function pendingGoalHasJobExpectationsStep() {
+  return GOALS_WITH_JOB_EXPECTATIONS_STEP.has(getPendingGoal()?.id)
+}
+
 function commitPendingGoal() {
   const pendingId = window.localStorage.getItem(PENDING_GOAL_KEY)
   const goal = goals.find((item) => item.id === pendingId && !item.comingSoon)
@@ -601,6 +699,19 @@ const opportunities = [
 
 const icon = (name, size = 18, className = 'icon') =>
   `<img aria-hidden="true" class="${className}" src="${ASSET}${name}" width="${size}" height="${size}" alt="">`
+
+const escapeHTML = (value = '') => String(value)
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
+const externalUrl = (value = '') => {
+  const normalized = value.trim()
+  if (!normalized) return ''
+  return /^(https?:\/\/)/i.test(normalized) ? normalized : `https://${normalized}`
+}
 
 function badge(content) {
   return `<span class="badge badge--outline">${content}</span>`
@@ -721,13 +832,14 @@ function navigatorGoalsHeader() {
 
 function goalCard(goal) {
   const savedGoals = getSavedGoals()
+  const selected = savedGoals.some((item) => item.id === goal.id)
   const trackAlreadyUsed = savedGoals.some((item) => item.kind === goal.kind)
   const unavailable = goal.comingSoon || trackAlreadyUsed || savedGoals.length >= MAX_GOALS
   return controlButton({
-    className: 'goal-card',
+    className: `goal-card ${selected ? 'goal-card--selected' : ''}`,
     attributes: `data-goal-id="${goal.id}" ${unavailable ? `disabled ${goal.comingSoon ? `aria-describedby="${goal.id}-state"` : ''}` : ''}`,
     content: `<span class="goal-card__heading">
-        <span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(iconByKind[goal.kind])}</span>
+        <span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(selected ? 'check-verified.svg' : iconByKind[goal.kind])}</span>
         <span class="goal-card__category">${goal.category}</span>
         ${goal.comingSoon ? badge(`<span id="${goal.id}-state">Готовим</span>`) : ''}
       </span>
@@ -781,6 +893,9 @@ function appTemplate() {
 }
 
 function workExperienceTemplate() {
+  const hasSecondStep = pendingGoalHasJobExpectationsStep()
+  const values = getGoalFormValues()
+  const fieldsDisabled = values.noWork ? 'disabled' : ''
   return `
     <div class="app-shell">
       ${globalNav()}
@@ -802,19 +917,19 @@ function workExperienceTemplate() {
         ${privacyNote()}
 
         <div class="work-step__layout">
-          <form class="work-form" data-goal-form novalidate>
+          <form class="work-form" data-goal-form ${hasSecondStep ? '' : 'data-goal-form-final'} novalidate>
             <div class="work-form__heading">
-              <span>Шаг 1 из 2</span>
+              <span>Шаг 1 из ${hasSecondStep ? '2' : '1'}</span>
               <h2>Расскажи о своей работе</h2>
             </div>
             <div class="work-form__fields">
-              ${checkboxControl({ className: 'work-checkbox', inputAttributes: 'data-no-work', boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
-              ${fieldControl({ id: 'company', label: 'Компания*', placeholder: 'Название компании', errorMessage: 'Укажи название компании' })}
-              ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
-              ${fieldControl({ id: 'grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
-              ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', options: CAREER_SALARY_OPTIONS, required: false })}
+              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-work ${values.noWork ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
+              ${fieldControl({ id: 'company', label: 'Компания*', placeholder: 'Название компании', value: values.company || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
+              ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: values.specialty || '', inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
+              ${fieldControl({ id: 'grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.grade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
+              ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.salary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
-            ${controlButton({ className: 'work-form__submit flat-button flat-button--primary', content: 'Продолжить', type: 'submit' })}
+            ${controlButton({ className: 'work-form__submit flat-button flat-button--primary', content: hasSecondStep ? 'Продолжить' : 'Отправить', type: 'submit' })}
           </form>
 
         </div>
@@ -850,6 +965,8 @@ function privacyNote() {
 }
 
 function jobExpectationsTemplate() {
+  const values = getGoalFormValues()
+  const fieldsDisabled = values.noExpectations ? 'disabled' : ''
   return `
     <div class="app-shell">
       ${globalNav()}
@@ -867,11 +984,11 @@ function jobExpectationsTemplate() {
               <h2>Расскажи об ожиданиях от работы</h2>
             </div>
             <div class="work-form__fields">
-              ${checkboxControl({ className: 'work-checkbox', inputAttributes: 'data-no-expectations', boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
-              ${fieldControl({ id: 'desired-company', label: 'Компания*', placeholder: 'Название компании', errorMessage: 'Укажи название компании' })}
-              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
-              ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
-              ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', options: CAREER_SALARY_OPTIONS, required: false })}
+              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
+              ${fieldControl({ id: 'desired-company', label: 'Компания*', placeholder: 'Название компании', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
+              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: values.desiredSpecialty || '', inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
+              ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.desiredGrade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
+              ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.desiredSalary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
             <div class="work-form__actions">
               ${controlButton({ className: 'flat-button flat-button--outline', content: 'Назад', attributes: 'data-back-to-work' })}
@@ -1318,11 +1435,11 @@ function studyGoalTemplate() {
               ['planner', 'Планировщик'],
               ['catalog', 'Каталог курсов'],
               ['glossary', 'Глоссарий'],
-            ].map(([id, label]) => tabControl({ id, label, active: id === 'planner' })).join('')}
+            ].map(([id, label]) => tabControl({ id, label, active: id === 'goal' })).join('')}
           </div>
         </section>
 
-        <div id="study-panel-goal" role="tabpanel" aria-labelledby="study-tab-goal" data-study-panel="goal" hidden>
+        <div id="study-panel-goal" role="tabpanel" aria-labelledby="study-tab-goal" data-study-panel="goal">
           <section class="study-content-panel study-goal-panel" aria-labelledby="study-goal-heading">
             <h2 class="visually-hidden" id="study-goal-heading">Моя цель</h2>
             <div class="study-goal-shell">
@@ -1330,7 +1447,7 @@ function studyGoalTemplate() {
                 <div class="study-goal-shell__meta">
                   <strong>Учеба</strong>
                   <span class="badge badge--positive">${icon('check-verified.svg', 16)}<span data-study-stage-summary>${summary.completedStages} из ${studyStages.length} завершено</span></span>
-                  <span class="study-goal-shell__state">Открыть</span>
+                  ${goalDetailActions('study')}
                 </div>
                 <div class="study-goal-summary">
                   <h3>Хочу учиться</h3>
@@ -1352,7 +1469,7 @@ function studyGoalTemplate() {
             </div>
           </section>
         </div>
-        <div id="study-panel-planner" role="tabpanel" aria-labelledby="study-tab-planner" data-study-panel="planner">
+        <div id="study-panel-planner" role="tabpanel" aria-labelledby="study-tab-planner" data-study-panel="planner" hidden>
           ${plannerTemplate()}
         </div>
         <div id="study-panel-catalog" role="tabpanel" aria-labelledby="study-tab-catalog" data-study-panel="catalog" hidden>
@@ -1389,7 +1506,7 @@ function vacancyCardTemplate(vacancy, { openable = true } = {}) {
           ${controlButton({
             className: `vacancy-card__apply ${applied ? 'vacancy-card__apply--done' : ''}`,
             content: `${applied ? icon('check-green.svg', 20) : ''}<span>${applied ? 'Откликнулся' : 'Откликнуться'}</span>`,
-            attributes: `aria-pressed="${applied}" data-vacancy-apply="${vacancy.id}"`,
+            attributes: `aria-pressed="${applied}" data-vacancy-apply="${vacancy.id}"${applied ? ' disabled' : ''}`,
           })}
           ${controlButton({
             className: `vacancy-card__favorite ${favorite ? 'is-active' : ''}`,
@@ -1400,6 +1517,99 @@ function vacancyCardTemplate(vacancy, { openable = true } = {}) {
         <span>${vacancy.fresh}</span>
       </footer>
     </article>`
+}
+
+function vacancyApplicationToolbar() {
+  const tool = (asset, label, disabled = false) => `<span class="vacancy-apply-toolbar__tool ${disabled ? 'is-disabled' : ''}" aria-label="${label}" role="img">${icon(asset, 18)}</span>`
+  const divider = '<span class="vacancy-apply-toolbar__divider" aria-hidden="true"></span>'
+  return `${tool('vacancy-apply-undo.svg', 'Отменить действие', true)}${tool('vacancy-apply-redo.svg', 'Повторить действие', true)}${divider}${tool('vacancy-apply-text.svg', 'Формат текста')}${tool('vacancy-apply-list.svg', 'Маркированный список')}${tool('vacancy-apply-link.svg', 'Добавить ссылку')}${divider}${tool('vacancy-apply-underline.svg', 'Подчеркнуть')}${tool('vacancy-apply-highlight.svg', 'Выделить текст')}${divider}${tool('vacancy-apply-clear-format.svg', 'Очистить форматирование')}${divider}`
+}
+
+function openVacancyApplicationDialog(vacancy) {
+  if (!vacancy) return
+  previouslyFocused = document.activeElement
+  const modalRoot = document.querySelector('#modal-root')
+
+  if (!portfolioProfiles.length) {
+    modalRoot.innerHTML = `<div class="modal-backdrop" role="presentation">
+      <div class="goal-dialog goal-dialog--sm vacancy-no-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="vacancy-no-profile-title" aria-describedby="vacancy-no-profile-description" tabindex="-1">
+        ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+        <img class="vacancy-no-profile-dialog__illustration" src="${ASSET}vacancy-no-profile.svg" width="200" height="200" alt="">
+        <div class="vacancy-no-profile-dialog__content">
+          <div class="vacancy-no-profile-dialog__copy">
+            <h2 id="vacancy-no-profile-title">Сперва заполни профиль</h2>
+            <p id="vacancy-no-profile-description">Чтобы откликнуться на вакансию, нужно завести хотя бы один профиль с резюме и портфолио</p>
+          </div>
+          <div class="vacancy-no-profile-dialog__actions">
+            ${controlButton({ className: 'flat-button flat-button--primary', content: 'Добавить профиль', attributes: 'data-vacancy-add-profile' })}
+            ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
+          </div>
+        </div>
+      </div>
+    </div>`
+    setModalState(true)
+    modalRoot.querySelector('.vacancy-no-profile-dialog')?.focus()
+    return
+  }
+
+  const primaryProfile = portfolioProfiles.find((profile) => profile.primary)
+  const profileOptions = portfolioProfiles.map((profile) => ({ value: profile.id, label: profile.name }))
+  modalRoot.innerHTML = `<div class="modal-backdrop" role="presentation">
+    <div class="goal-dialog vacancy-apply-dialog" role="dialog" aria-modal="true" aria-labelledby="vacancy-apply-title" aria-describedby="vacancy-apply-description" tabindex="-1">
+      ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+      <div class="goal-dialog__header">
+        <h2 id="vacancy-apply-title">Откликнуться на вакансию</h2>
+        <p class="goal-dialog__lead" id="vacancy-apply-description">Рекрутер увидит твой отклик в ближайшее время</p>
+      </div>
+      <form class="vacancy-apply-form" data-vacancy-application-form="${escapeHTML(vacancy.id)}" novalidate>
+        <div class="vacancy-apply-form__fields">
+          ${fieldControl({
+            id: 'vacancy-application-profile',
+            label: 'Выбери профиль',
+            placeholder: '',
+            options: profileOptions,
+            value: primaryProfile?.id || '',
+            required: false,
+          })}
+          <div class="vacancy-apply-letter">
+            ${fieldControl({
+              id: 'vacancy-cover-letter',
+              label: 'Сопроводительное письмо',
+              placeholder: '',
+              required: false,
+              multiline: true,
+              toolbarContent: vacancyApplicationToolbar(),
+              inputAttributes: 'maxlength="2500" data-vacancy-cover-letter aria-describedby="vacancy-cover-letter-helper"',
+            })}
+            <span class="vacancy-apply-letter__helper" id="vacancy-cover-letter-helper">До 2500 символов</span>
+          </div>
+          <div class="vacancy-apply-consent">
+            ${checkboxControl({
+              className: 'vacancy-apply-consent__control',
+              inputAttributes: 'required data-vacancy-application-consent aria-describedby="vacancy-application-consent-error"',
+              boxContent: icon('check-small.svg', 20),
+              content: '<span>Я согласен с пользовательским соглашением</span>',
+            })}
+            <span class="vacancy-apply-consent__error" id="vacancy-application-consent-error" aria-live="polite">Подтверди согласие</span>
+          </div>
+        </div>
+        <div class="goal-dialog__actions">
+          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
+          ${controlButton({ className: 'flat-button flat-button--primary', content: 'Откликнуться', type: 'submit' })}
+        </div>
+      </form>
+    </div>
+  </div>`
+  setModalState(true)
+  modalRoot.querySelector('.vacancy-apply-dialog')?.focus()
+}
+
+function renderVacancyAfterApplication(vacancyId) {
+  if (getScreenFromLocation() === 'vacancy') {
+    renderScreen('vacancy', { animate: false, historyMode: 'none' })
+    return
+  }
+  renderVacanciesPanel({ focusSelector: `[data-vacancy-open="${vacancyId}"]` })
 }
 
 function vacancyInfoBlock(title, content, className = '') {
@@ -1628,6 +1838,255 @@ function openApplicationDrawer(application = null) {
   document.querySelector('.application-drawer').focus()
 }
 
+function formatPortfolioFileSize(size = 0) {
+  if (!Number.isFinite(size) || size <= 0) return ''
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} КБ`
+  return `${(size / (1024 * 1024)).toFixed(2).replace('.', ',')} МБ`
+}
+
+function portfolioMaterialTemplate(label, linkLabel, link, file, kind, profileId) {
+  const safeLabel = escapeHTML(label)
+  const safeLinkLabel = escapeHTML(linkLabel)
+  const href = externalUrl(link)
+
+  return `
+    <section class="portfolio-material" aria-label="${safeLabel}">
+      <span class="portfolio-material__label">${safeLabel}</span>
+      ${file ? `<div class="portfolio-file">
+        ${icon('portfolio-file.svg', 24)}
+        <span class="portfolio-file__name">${escapeHTML(file.name)}</span>
+        ${file.size ? `<span class="portfolio-file__size">${formatPortfolioFileSize(Number(file.size))}</span>` : ''}
+        ${controlButton({ className: 'portfolio-file__download', content: icon('portfolio-download.svg', 24), attributes: `aria-label="Скачать ${safeLabel.toLowerCase()}" data-portfolio-download="${profileId}" data-portfolio-file-kind="${kind}"` })}
+      </div>` : '<span class="portfolio-material__empty">Файл не добавлен</span>'}
+      ${href ? `<a class="portfolio-material__link" href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer"><span>${safeLinkLabel}</span>${icon('portfolio-external.svg', 18)}</a>` : '<span class="portfolio-material__empty-link">Ссылка не добавлена</span>'}
+    </section>`
+}
+
+function portfolioProfileCard(profile, index, profiles) {
+  const tone = profile.tone || PORTFOLIO_PROFILE_TONES[index % PORTFOLIO_PROFILE_TONES.length]
+  return `
+    <article class="portfolio-profile-card portfolio-profile-card--tone-${tone}">
+      <div class="portfolio-profile-card__surface">
+        <header class="portfolio-profile-card__header">
+          <h3>${escapeHTML(profile.name)}</h3>
+          ${profile.description ? `<p>${escapeHTML(profile.description)}</p>` : ''}
+        </header>
+        <div class="portfolio-profile-card__materials">
+          ${portfolioMaterialTemplate('Резюме', 'Ссылка на резюме', profile.resumeLink, profile.resumeFile, 'resume', profile.id)}
+          ${portfolioMaterialTemplate('Портфолио', 'Ссылка на портфолио', profile.portfolioLink, profile.portfolioFile, 'portfolio', profile.id)}
+        </div>
+      </div>
+      <footer class="portfolio-profile-card__footer">
+        ${profiles.length > 1 ? toggleControl({ className: 'portfolio-profile-card__primary', inputAttributes: `data-portfolio-primary="${profile.id}" ${profile.primary ? 'checked' : ''}`, label: 'Основной профиль' }) : ''}
+        <div class="portfolio-profile-card__actions">
+          ${controlButton({ className: 'flat-button portfolio-profile-card__delete', content: 'Удалить', attributes: `data-portfolio-delete="${profile.id}"` })}
+          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать', attributes: `data-portfolio-edit="${profile.id}"` })}
+        </div>
+      </footer>
+    </article>`
+}
+
+function portfolioPreparationPanel() {
+  return `
+    <aside class="portfolio-preparation" aria-labelledby="portfolio-preparation-title">
+      <div class="portfolio-preparation__body">
+        <h2 id="portfolio-preparation-title">Подготовка</h2>
+        <p>Обратись к консультанту — он поможет составить резюме и портфолио под твою специальность с учётом твоего опыта и навыков.</p>
+        <img src="${ASSET}portfolio-preparation.png" width="275" height="146" alt="">
+      </div>
+      <div class="portfolio-preparation__rule">
+        ${controlButton({ className: 'flat-button flat-button--neutral portfolio-preparation__action', content: 'Получить консультацию' })}
+      </div>
+    </aside>`
+}
+
+function portfolioTemplate() {
+  const sortedProfiles = [...portfolioProfiles].sort((first, second) => Number(second.primary) - Number(first.primary) || first.createdAt - second.createdAt)
+
+  return `
+    <div class="portfolio-layout">
+      <section class="portfolio-content" aria-labelledby="portfolio-title">
+        <h2 class="visually-hidden" id="portfolio-title">Резюме и портфолио</h2>
+        ${sortedProfiles.length ? `
+          <div class="portfolio-profile-list">${sortedProfiles.map(portfolioProfileCard).join('')}</div>
+          <div class="portfolio-content__add">${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Профиль</span>`, attributes: 'data-portfolio-add' })}</div>` : `
+          <div class="portfolio-empty">
+            <div class="portfolio-empty__copy">
+              <h2>Подготовь материалы для отклика</h2>
+              <p>Заполни несколько профилей, добавь в них резюме и портфолио по своей профессии и сопроводительное письмо. Ты сможешь использовать профили при отклике на вакансии.</p>
+            </div>
+            ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Профиль</span>`, attributes: 'data-portfolio-add' })}
+          </div>`}
+      </section>
+      ${portfolioPreparationPanel()}
+    </div>`
+}
+
+function profileEditorTemplate() {
+  const profile = portfolioProfiles.find((item) => item.id === editingPortfolioProfileId)
+  const resumeFile = portfolioDraftFiles.resume || profile?.resumeFile || null
+  const portfolioFile = portfolioDraftFiles.portfolio || profile?.portfolioFile || null
+
+  return `
+    <div class="app-shell">
+      ${globalNav()}
+      ${mobileNav({ backButton: true, backTarget: 'portfolio' })}
+      ${informerFooter()}
+      <main class="page-content work-step profile-page">
+        <div class="work-step__header">
+          ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>К резюме и портфолио</span>`, attributes: 'data-back-to-portfolio' })}
+          <section class="header-island header-island--work" aria-labelledby="profile-page-title">
+            <div class="header-island__copy">
+              <h1 id="profile-page-title" tabindex="-1">Профиль</h1>
+              <div class="header-island__support"><p>Добавь резюме и портфолио по своей профессии</p></div>
+            </div>
+          </section>
+        </div>
+        <form class="profile-form" data-portfolio-form novalidate>
+          <div class="profile-form__sections">
+            <section class="profile-form__section" aria-labelledby="profile-private-title">
+              <h2 id="profile-private-title">Не публичная информация</h2>
+              ${fieldControl({ id: 'profile-name', label: 'Название профиля', placeholder: '', value: profile?.name || '', errorMessage: 'Укажи название профиля' })}
+              ${fieldControl({ id: 'profile-description', label: 'Описание профиля', placeholder: '', value: profile?.description || '', required: false, multiline: true, className: 'profile-description-field' })}
+            </section>
+            <section class="profile-form__section" aria-labelledby="profile-public-title">
+              <h2 id="profile-public-title">Эту информацию увидит рекрутер</h2>
+              ${fieldControl({ id: 'profile-resume-link', label: 'Ссылка на резюме', placeholder: '', value: profile?.resumeLink || '', required: false })}
+              ${fileControl({ id: 'profile-resume-file', label: 'Файл с резюме', file: resumeFile, inputAttributes: 'data-profile-file-kind="resume"', checkContent: icon('check-green.svg', 20), clearContent: icon('application-date-clear.svg', 24) })}
+              ${fieldControl({ id: 'profile-portfolio-link', label: 'Ссылка на портфолио', placeholder: '', value: profile?.portfolioLink || '', required: false })}
+              ${fileControl({ id: 'profile-portfolio-file', label: 'Файл с портфолио', file: portfolioFile, inputAttributes: 'data-profile-file-kind="portfolio"', checkContent: icon('check-green.svg', 20), clearContent: icon('application-date-clear.svg', 24) })}
+            </section>
+          </div>
+          ${controlButton({ className: 'flat-button flat-button--primary profile-form__submit', content: 'Сохранить', type: 'submit' })}
+        </form>
+      </main>
+      <div id="modal-root"></div>
+    </div>`
+}
+
+function renderPortfolioPanel({ focusSelector } = {}) {
+  const panel = root.querySelector('[data-study-panel="portfolio"]')
+  if (!panel) return
+  panel.innerHTML = portfolioTemplate()
+  if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
+}
+
+function openPortfolioProfileEditor(profile = null) {
+  editingPortfolioProfileId = profile?.id || null
+  portfolioDraftFiles = {
+    resume: profile?.resumeFile || null,
+    portfolio: profile?.portfolioFile || null,
+  }
+  portfolioDraftFileObjects = {
+    resume: profile ? portfolioFileObjects.get(`${profile.id}:resume`) || null : null,
+    portfolio: profile ? portfolioFileObjects.get(`${profile.id}:portfolio`) || null : null,
+  }
+  renderScreen('profile')
+}
+
+function returnToPortfolio() {
+  editingPortfolioProfileId = null
+  portfolioDraftFiles = { resume: undefined, portfolio: undefined }
+  portfolioDraftFileObjects = { resume: null, portfolio: null }
+  requestedStudyTab = 'portfolio'
+  renderScreen('industry-goal')
+}
+
+function setPortfolioFileError(field, message = '') {
+  const error = field.querySelector('.ui-field__error')
+  field.classList.toggle('ui-file-field--error', Boolean(message))
+  if (error) {
+    error.textContent = message
+    error.style.display = message ? 'block' : ''
+  }
+}
+
+function updatePortfolioFileControl(field, file) {
+  const kind = field.querySelector('[data-profile-file-kind]')?.dataset.profileFileKind
+  if (!kind || !file) return false
+  const extension = file.name.split('.').pop()?.toLocaleLowerCase('ru')
+  if (!['jpg', 'jpeg', 'png', 'pdf'].includes(extension)) {
+    setPortfolioFileError(field, 'Выбери файл формата jpg, png или pdf')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    setPortfolioFileError(field, 'Размер файла не должен превышать 5 МБ')
+    return false
+  }
+
+  portfolioDraftFiles[kind] = { name: file.name, size: file.size, type: file.type }
+  portfolioDraftFileObjects[kind] = file
+  field.querySelector('[data-file-name]').textContent = file.name
+  field.querySelector('[data-file-selected]').hidden = false
+  setPortfolioFileError(field)
+  return true
+}
+
+function clearPortfolioFile(field) {
+  const input = field.querySelector('[data-profile-file-kind]')
+  const kind = input?.dataset.profileFileKind
+  if (!kind) return
+  input.value = ''
+  portfolioDraftFiles[kind] = null
+  portfolioDraftFileObjects[kind] = null
+  field.querySelector('[data-file-name]').textContent = ''
+  field.querySelector('[data-file-selected]').hidden = true
+  setPortfolioFileError(field)
+}
+
+function openPortfolioDeleteDialog(profile) {
+  previouslyFocused = document.activeElement
+  document.querySelector('#modal-root').innerHTML = `
+    <div class="modal-backdrop" role="presentation">
+      <div class="goal-dialog goal-dialog--sm portfolio-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="portfolio-delete-title" aria-describedby="portfolio-delete-description" tabindex="-1">
+        ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+        <div class="goal-dialog__header">
+          <h2 id="portfolio-delete-title">Удалить профиль?</h2>
+          <p class="goal-dialog__lead" id="portfolio-delete-description">Профиль «${escapeHTML(profile.name)}» и добавленные в него материалы будут удалены.</p>
+        </div>
+        <div class="goal-dialog__actions">
+          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
+          ${controlButton({ className: 'flat-button flat-button--danger', content: 'Удалить', attributes: `data-portfolio-delete-confirm="${profile.id}"` })}
+        </div>
+      </div>
+    </div>`
+  setModalState(true)
+  document.querySelector('.portfolio-delete-dialog').focus()
+}
+
+function goalDetailActions(kind) {
+  const goal = getSavedGoals().find((item) => item.kind === kind)
+  if (!goal) return ''
+
+  return `<div class="study-goal-shell__actions">
+    ${controlButton({ className: 'flat-button study-goal-shell__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
+    ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать', attributes: `data-edit-current-goal="${goal.id}"` })}
+  </div>`
+}
+
+function openGoalDeleteDialog(goal) {
+  previouslyFocused = document.activeElement
+  const title = goal.kind === 'study'
+    ? 'Хочу учиться'
+    : goal.id === 'first-job' ? 'Выйти на первую работу или стажировку' : goal.title
+  document.querySelector('#modal-root').innerHTML = `
+    <div class="modal-backdrop" role="presentation">
+      <div class="goal-dialog goal-dialog--sm goal-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="goal-delete-title" aria-describedby="goal-delete-description" tabindex="-1">
+        ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
+        <div class="goal-dialog__header">
+          <h2 id="goal-delete-title">Удалить цель?</h2>
+          <p class="goal-dialog__lead" id="goal-delete-description">Цель «${escapeHTML(title)}» и&nbsp;прогресс по&nbsp;её этапам будут удалены.</p>
+        </div>
+        <div class="goal-dialog__actions">
+          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
+          ${controlButton({ className: 'flat-button flat-button--danger', content: 'Удалить', attributes: `data-delete-current-goal-confirm="${goal.id}"` })}
+        </div>
+      </div>
+    </div>`
+  setModalState(true)
+  document.querySelector('.goal-delete-dialog').focus()
+}
+
 function industryGoalTemplate() {
   const progress = getIndustryProgress()
   const summary = getIndustryProgressSummary(progress)
@@ -1668,7 +2127,7 @@ function industryGoalTemplate() {
                 <div class="study-goal-shell__meta">
                   <strong>Индустрия</strong>
                   <span class="badge badge--positive">${icon('check-verified.svg', 16)}<span data-industry-stage-summary>${summary.completedStages} из ${industryStages.length} завершено</span></span>
-                  <span class="study-goal-shell__state">Открыть</span>
+                  ${goalDetailActions('industry')}
                 </div>
                 <div class="study-goal-summary">
                   <h3>${goalTitle}</h3>
@@ -1697,7 +2156,7 @@ function industryGoalTemplate() {
           ${applicationsTemplate()}
         </div>
         <div id="study-panel-portfolio" role="tabpanel" aria-labelledby="study-tab-portfolio" data-study-panel="portfolio" hidden>
-          ${studyTabPlaceholder('portfolio', 'Резюме и портфолио', 'Здесь появятся материалы для подготовки резюме и портфолио.')}
+          ${portfolioTemplate()}
         </div>
       </main>
       <div id="modal-root"></div>
@@ -1771,6 +2230,7 @@ const screenRoutes = {
   'my-goals': { template: myGoalsTemplate, focus: '#my-goals-title' },
   'study-goal': { template: studyGoalTemplate, focus: '#study-detail-title' },
   'industry-goal': { template: industryGoalTemplate, focus: '#industry-detail-title' },
+  profile: { template: profileEditorTemplate, focus: '#profile-page-title' },
   vacancy: { template: vacancyDetailTemplate, focus: '.vacancy-detail__block h2' },
 }
 
@@ -1780,6 +2240,7 @@ function getScreenFromLocation() {
   const view = new URLSearchParams(window.location.search).get('view')
   if (screen === 'study-goal' && view === 'industry') return 'industry-goal'
   if (screen === 'study-goal' && view === 'vacancy') return 'vacancy'
+  if (screen === 'job-expectations' && !pendingGoalHasJobExpectationsStep()) return 'work-experience'
   return screenRoutes[screen] ? screen : 'goals'
 }
 
@@ -1788,6 +2249,7 @@ const appRootPath = APP_ROOT_URL.pathname
 function getScreenUrl(screen) {
   if (screen === 'industry-goal') return `${appRootPath}study-goal/?view=industry`
   if (screen === 'vacancy' && selectedVacancyId) return `${appRootPath}study-goal/?view=vacancy&id=${encodeURIComponent(selectedVacancyId)}`
+  if (screen === 'profile' && editingPortfolioProfileId) return `${appRootPath}profile/?id=${encodeURIComponent(editingPortfolioProfileId)}`
   return `${appRootPath}${screen}/`
 }
 
@@ -1934,7 +2396,7 @@ function openGoalLimitDialog() {
   previouslyFocused = document.activeElement
   document.querySelector('#modal-root').innerHTML = `
     <div class="modal-backdrop" role="presentation">
-      <div class="goal-dialog goal-limit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="goal-limit-title" aria-describedby="goal-limit-description" tabindex="-1">
+      <div class="goal-dialog goal-dialog--sm goal-limit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="goal-limit-title" aria-describedby="goal-limit-description" tabindex="-1">
         ${controlButton({ className: 'goal-dialog__close', content: icon('goal-limit-close.svg', 20), attributes: 'aria-label="Закрыть"' })}
         <img class="goal-limit-dialog__image" src="${ASSET}goal-limit-illustration.svg" width="200" height="200" alt="">
         <div class="goal-limit-dialog__bottom">
@@ -2038,7 +2500,7 @@ function openPlannerResetDialog(semester = null) {
 
   document.querySelector('#modal-root').innerHTML = `
     <div class="modal-backdrop" role="presentation">
-      <div class="goal-dialog planner-dialog planner-reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="planner-reset-title" aria-describedby="planner-reset-description" tabindex="-1">
+      <div class="goal-dialog goal-dialog--sm planner-dialog planner-reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="planner-reset-title" aria-describedby="planner-reset-description" tabindex="-1">
         ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть"' })}
         <div class="goal-dialog__header">
           <h2 id="planner-reset-title">Сбросить курсы?</h2>
@@ -2276,7 +2738,7 @@ function updateIndustryProgress() {
 
 function restartScenario() {
   try {
-    ;[SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PLANNER_STORAGE_KEY]
+    ;[SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PORTFOLIO_PROFILES_STORAGE_KEY, GOAL_FORM_VALUES_KEY, PLANNER_STORAGE_KEY]
       .forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // The scenario still restarts in memory when storage is unavailable.
@@ -2285,6 +2747,11 @@ function restartScenario() {
   plannerState = createDefaultPlannerState()
   vacancyState = { favorites: new Set(), applied: new Set() }
   applications = defaultApplications.map((item) => ({ ...item }))
+  portfolioProfiles = []
+  editingPortfolioProfileId = null
+  portfolioDraftFiles = { resume: undefined, portfolio: undefined }
+  portfolioDraftFileObjects = { resume: null, portfolio: null }
+  portfolioFileObjects.clear()
   vacancySearch = ''
   vacancyFavoritesOnly = false
   vacancyFilters.clear()
@@ -2508,17 +2975,115 @@ root.addEventListener('click', (event) => {
   }
 
   const card = event.target.closest('.goal-card:not(:disabled)')
-  if (card) openDialog(goals.find((goal) => goal.id === card.dataset.goalId))
+  if (card) {
+    const goal = goals.find((item) => item.id === card.dataset.goalId)
+    if (SHOW_GOAL_INFO_DIALOG) openDialog(goal)
+    else {
+      setPendingGoal(goal)
+      renderScreen('work-experience')
+    }
+    return
+  }
 
   const savedGoalButton = event.target.closest('[data-open-saved-goal]')
   if (savedGoalButton?.dataset.openSavedGoal === 'study') renderScreen('study-goal')
   if (savedGoalButton?.dataset.openSavedGoal === 'industry') renderScreen('industry-goal')
+
+  const editCurrentGoal = event.target.closest('[data-edit-current-goal]')
+  if (editCurrentGoal) {
+    const goal = goals.find((item) => item.id === editCurrentGoal.dataset.editCurrentGoal)
+    if (goal) {
+      setPendingGoal(goal)
+      renderScreen('work-experience')
+    }
+    return
+  }
+
+  const deleteCurrentGoal = event.target.closest('[data-delete-current-goal]')
+  if (deleteCurrentGoal) {
+    const goal = goals.find((item) => item.id === deleteCurrentGoal.dataset.deleteCurrentGoal)
+    if (goal) openGoalDeleteDialog(goal)
+    return
+  }
+
+  const confirmGoalDelete = event.target.closest('[data-delete-current-goal-confirm]')
+  if (confirmGoalDelete) {
+    const goal = goals.find((item) => item.id === confirmGoalDelete.dataset.deleteCurrentGoalConfirm)
+    if (!goal) return
+    try {
+      const remaining = getSavedGoalIds().filter((id) => id !== goal.id)
+      window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify(remaining))
+      if (window.localStorage.getItem(PENDING_GOAL_KEY) === goal.id) window.localStorage.removeItem(PENDING_GOAL_KEY)
+      window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : INDUSTRY_PROGRESS_KEY)
+      const savedValues = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
+      if (savedValues && typeof savedValues === 'object') {
+        delete savedValues[goal.id]
+        window.localStorage.setItem(GOAL_FORM_VALUES_KEY, JSON.stringify(savedValues))
+      }
+    } catch {
+      // Keep navigation available even when storage is unavailable.
+    }
+    closeDialog(() => renderScreen('my-goals'))
+    return
+  }
 
   const studyTab = event.target.closest('[data-study-tab]')
   if (studyTab) {
     vacancyDirectionOpen = false
     applicationFilterOpen = null
     activateStudyTab(studyTab)
+  }
+
+  if (event.target.closest('[data-portfolio-add]')) {
+    openPortfolioProfileEditor()
+    return
+  }
+
+  const portfolioEdit = event.target.closest('[data-portfolio-edit]')
+  if (portfolioEdit) {
+    openPortfolioProfileEditor(portfolioProfiles.find((profile) => profile.id === portfolioEdit.dataset.portfolioEdit))
+    return
+  }
+
+  const portfolioDelete = event.target.closest('[data-portfolio-delete]')
+  if (portfolioDelete) {
+    const profile = portfolioProfiles.find((item) => item.id === portfolioDelete.dataset.portfolioDelete)
+    if (profile) openPortfolioDeleteDialog(profile)
+    return
+  }
+
+  const portfolioDeleteConfirm = event.target.closest('[data-portfolio-delete-confirm]')
+  if (portfolioDeleteConfirm) {
+    const deletedId = portfolioDeleteConfirm.dataset.portfolioDeleteConfirm
+    const wasPrimary = portfolioProfiles.find((profile) => profile.id === deletedId)?.primary
+    portfolioProfiles = portfolioProfiles.filter((profile) => profile.id !== deletedId)
+    portfolioFileObjects.delete(`${deletedId}:resume`)
+    portfolioFileObjects.delete(`${deletedId}:portfolio`)
+    if (wasPrimary && portfolioProfiles.length === 1) portfolioProfiles[0].primary = true
+    savePortfolioProfiles()
+    closeDialog(() => renderPortfolioPanel({ focusSelector: '[data-portfolio-add]' }))
+    return
+  }
+
+  const portfolioDownload = event.target.closest('[data-portfolio-download]')
+  if (portfolioDownload) {
+    const key = `${portfolioDownload.dataset.portfolioDownload}:${portfolioDownload.dataset.portfolioFileKind}`
+    const file = portfolioFileObjects.get(key)
+    if (file) {
+      const href = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = href
+      link.download = file.name
+      link.click()
+      URL.revokeObjectURL(href)
+    }
+    return
+  }
+
+  const portfolioFileClear = event.target.closest('[data-file-clear]')
+  if (portfolioFileClear) {
+    clearPortfolioFile(portfolioFileClear.closest('[data-file-control]'))
+    return
   }
 
   const applicationFilterToggle = event.target.closest('[data-application-filter-toggle]')
@@ -2567,6 +3132,14 @@ root.addEventListener('click', (event) => {
     return
   }
 
+  if (event.target.closest('[data-vacancy-add-profile]')) {
+    closeDialog(() => {
+      requestedStudyTab = 'portfolio'
+      renderScreen('industry-goal')
+    })
+    return
+  }
+
   const vacancyFavorite = event.target.closest('[data-vacancy-favorite]')
   if (vacancyFavorite) {
     const id = vacancyFavorite.dataset.vacancyFavorite
@@ -2580,23 +3153,8 @@ root.addEventListener('click', (event) => {
   const vacancyApply = event.target.closest('[data-vacancy-apply]')
   if (vacancyApply) {
     const id = vacancyApply.dataset.vacancyApply
-    const alreadyApplied = vacancyState.applied.has(id)
-    if (alreadyApplied) {
-      vacancyState.applied.delete(id)
-      applications = applications.filter((item) => item.vacancyId !== id)
-    } else {
-      vacancyState.applied.add(id)
-      const vacancy = vacancies.find((item) => item.id === id)
-      if (vacancy && !applications.some((item) => item.vacancyId === id)) applications.unshift({
-        id: `internal-${id}`, internal: true, vacancyId: id, company: vacancy.company,
-        date: new Date().toISOString().slice(0, 10), status: 'Новый', position: vacancy.title,
-        salary: normalizeApplicationSalary(vacancy.salary), source: 'ЦУ', link: '', contact: '', notes: '',
-      })
-    }
-    saveVacancyState()
-    saveApplications()
-    if (getScreenFromLocation() === 'vacancy') renderScreen('vacancy', { animate: false, historyMode: 'none' })
-    else renderVacanciesPanel({ focusSelector: `[data-vacancy-apply="${id}"]` })
+    if (!vacancyState.applied.has(id)) openVacancyApplicationDialog(vacancies.find((item) => item.id === id))
+    return
   }
 
   if (event.target.closest('[data-vacancy-favorites-only]')) {
@@ -2872,6 +3430,11 @@ root.addEventListener('click', (event) => {
     renderScreen('industry-goal')
   }
 
+  if (event.target.closest('[data-back-to-portfolio]')) {
+    returnToPortfolio()
+    return
+  }
+
   if (event.target.closest('[data-add-goal]')) {
     if (getSavedGoals().length >= MAX_GOALS) openGoalLimitDialog()
     else renderScreen('goals')
@@ -2900,6 +3463,30 @@ document.addEventListener('click', (event) => {
 root.addEventListener('change', (event) => {
   if (event.target.matches('[data-study-task]')) updateStudyProgress()
   if (event.target.matches('[data-industry-task]')) updateIndustryProgress()
+
+  if (event.target.matches('[data-vacancy-application-consent]')) {
+    const field = event.target.closest('.vacancy-apply-consent')
+    field?.classList.toggle('is-error', !event.target.checked)
+    event.target.setAttribute('aria-invalid', String(!event.target.checked))
+  }
+
+  if (event.target.matches('[data-profile-file-kind]')) {
+    const field = event.target.closest('[data-file-control]')
+    const file = event.target.files?.[0]
+    if (file && !updatePortfolioFileControl(field, file)) event.target.value = ''
+  }
+
+  if (event.target.matches('[data-portfolio-primary]')) {
+    const profileId = event.target.dataset.portfolioPrimary
+    portfolioProfiles = portfolioProfiles.map((profile) => ({
+      ...profile,
+      primary: event.target.checked && profile.id === profileId,
+    }))
+    savePortfolioProfiles()
+    renderPortfolioPanel({ focusSelector: `[data-portfolio-primary="${profileId}"]` })
+    return
+  }
+
   if (event.target.matches('[data-vacancy-internships]')) {
     vacancyInternships = event.target.checked
     vacancyPage = 1
@@ -2980,6 +3567,27 @@ root.addEventListener('change', (event) => {
   if (event.target.matches('[data-ui-field]')) validateWorkField(event.target)
 })
 
+root.addEventListener('dragover', (event) => {
+  const drop = event.target.closest('[data-file-drop]')
+  if (!drop) return
+  event.preventDefault()
+  drop.classList.add('is-drag-over')
+})
+
+root.addEventListener('dragleave', (event) => {
+  const drop = event.target.closest('[data-file-drop]')
+  if (drop && !drop.contains(event.relatedTarget)) drop.classList.remove('is-drag-over')
+})
+
+root.addEventListener('drop', (event) => {
+  const drop = event.target.closest('[data-file-drop]')
+  if (!drop) return
+  event.preventDefault()
+  drop.classList.remove('is-drag-over')
+  const file = event.dataTransfer?.files?.[0]
+  if (file) updatePortfolioFileControl(drop.closest('[data-file-control]'), file)
+})
+
 root.addEventListener('input', (event) => {
   if (event.target.matches('[data-ui-field]')) validateWorkField(event.target)
   if (event.target.matches('[data-catalog-search]')) {
@@ -3025,6 +3633,89 @@ function focusWorkField(field) {
 }
 
 root.addEventListener('submit', (event) => {
+  if (event.target.matches('[data-vacancy-application-form]')) {
+    event.preventDefault()
+    const consent = event.target.querySelector('[data-vacancy-application-consent]')
+    if (!consent?.checked) {
+      consent?.closest('.vacancy-apply-consent')?.classList.add('is-error')
+      consent?.setAttribute('aria-invalid', 'true')
+      consent?.focus()
+      return
+    }
+
+    const vacancyId = event.target.dataset.vacancyApplicationForm
+    const vacancy = vacancies.find((item) => item.id === vacancyId)
+    if (!vacancy) return
+    const data = new FormData(event.target)
+    const profileId = String(data.get('vacancy-application-profile') || '')
+    const profile = portfolioProfiles.find((item) => item.id === profileId)
+    const application = {
+      id: `internal-${vacancyId}`,
+      internal: true,
+      vacancyId,
+      company: vacancy.company,
+      date: new Date().toISOString().slice(0, 10),
+      status: 'Новый',
+      position: vacancy.title,
+      salary: normalizeApplicationSalary(vacancy.salary),
+      source: 'ЦУ',
+      link: '',
+      contact: '',
+      notes: '',
+      profileId: profile?.id || null,
+      profileName: profile?.name || '',
+      coverLetter: String(data.get('vacancy-cover-letter') || '').trim(),
+    }
+    applications = [application, ...applications.filter((item) => item.vacancyId !== vacancyId)]
+    vacancyState.applied.add(vacancyId)
+    saveApplications()
+    saveVacancyState()
+    closeDialog(() => renderVacancyAfterApplication(vacancyId))
+    return
+  }
+
+  if (event.target.matches('[data-portfolio-form]')) {
+    event.preventDefault()
+    const fields = [...event.target.querySelectorAll('[data-ui-field]')]
+    const firstInvalid = fields.find((field) => !validateWorkField(field))
+    const invalidFile = event.target.querySelector('.ui-file-field--error')
+    if (firstInvalid) {
+      focusWorkField(firstInvalid)
+      return
+    }
+    if (invalidFile) {
+      invalidFile.querySelector('input[type="file"]')?.focus()
+      return
+    }
+
+    const data = new FormData(event.target)
+    const existing = portfolioProfiles.find((profile) => profile.id === editingPortfolioProfileId)
+    const id = existing?.id || `profile-${Date.now()}`
+    const profile = {
+      ...(existing || {}),
+      id,
+      name: String(data.get('profile-name') || '').trim(),
+      description: String(data.get('profile-description') || '').trim(),
+      resumeLink: String(data.get('profile-resume-link') || '').trim(),
+      resumeFile: portfolioDraftFiles.resume === undefined ? existing?.resumeFile || null : portfolioDraftFiles.resume,
+      portfolioLink: String(data.get('profile-portfolio-link') || '').trim(),
+      portfolioFile: portfolioDraftFiles.portfolio === undefined ? existing?.portfolioFile || null : portfolioDraftFiles.portfolio,
+      tone: existing?.tone || PORTFOLIO_PROFILE_TONES[portfolioProfiles.length % PORTFOLIO_PROFILE_TONES.length],
+      primary: existing?.primary || portfolioProfiles.length === 0,
+      createdAt: existing?.createdAt || Date.now(),
+    }
+
+    if (existing) portfolioProfiles = portfolioProfiles.map((item) => item.id === existing.id ? profile : item)
+    else portfolioProfiles.push(profile)
+    if (portfolioDraftFileObjects.resume) portfolioFileObjects.set(`${id}:resume`, portfolioDraftFileObjects.resume)
+    if (portfolioDraftFileObjects.portfolio) portfolioFileObjects.set(`${id}:portfolio`, portfolioDraftFileObjects.portfolio)
+    if (portfolioDraftFiles.resume === null) portfolioFileObjects.delete(`${id}:resume`)
+    if (portfolioDraftFiles.portfolio === null) portfolioFileObjects.delete(`${id}:portfolio`)
+    savePortfolioProfiles()
+    returnToPortfolio()
+    return
+  }
+
   if (event.target.matches('[data-application-form]')) {
     event.preventDefault()
     const fields = [...event.target.querySelectorAll('[data-ui-field]')]
@@ -3087,6 +3778,8 @@ root.addEventListener('submit', (event) => {
     return
   }
 
+  saveGoalFormValues(event.target)
+
   if (event.target.matches('[data-goal-form-final]')) {
     commitPendingGoal()
     renderScreen('success')
@@ -3098,6 +3791,7 @@ root.addEventListener('submit', (event) => {
 
 window.addEventListener('popstate', () => {
   selectedVacancyId = new URLSearchParams(window.location.search).get('id')
+  editingPortfolioProfileId = new URLSearchParams(window.location.search).get('id')
   if (getScreenFromLocation() === 'industry-goal') requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
   renderScreen(getScreenFromLocation(), { historyMode: 'none' })
 })

@@ -33,6 +33,8 @@
 
 ## Form validation
 
+- Keep a 20px vertical gap between adjacent fields in every form.
+- Use the shared `goal-dialog--sm` size (440px) for simple deletion and reset confirmations.
 - Never use the browser's native validation UI or system validation bubbles.
 - Add `novalidate` to forms and implement validation using the matching design-system input component states.
 - Error states must reproduce the component's border, background, message typography, spacing, and accessibility attributes.
@@ -42,6 +44,7 @@
 ## Goal-setting forms
 
 - Use the shared `surveyCompleteTemplate()` screen after successful completion of every goal-setting flow, regardless of the selected goal or form variant.
+- Show the job-expectations second step only for `first-job`, `freelance`, `change-company`, and `change-specialty`; all other goal flows finish after the first form step.
 - Mark the final form in a goal-setting flow with `data-goal-form-final`; after successful component validation, submit it through the shared page-background transition to `surveyCompleteTemplate()`.
 - Intermediate forms may use `data-goal-form`, but must continue to the next step instead of showing success early.
 - Do not create goal-specific success screens unless the user explicitly replaces this rule.
@@ -52,6 +55,7 @@
 - Every newly added goal starts at `0%` and `0 / 5 этапов завершено`.
 - Industry selections render an Industry goal card; Study selections render a Study goal card.
 - The Study goal opens `/study-goal/`. Its progress is derived from completed checklist tasks, and an entire stage counts as complete only when all of its tasks are checked.
+- Open the Study goal on its `Моя цель` tab by default; other tabs open only after an explicit tab selection.
 - Study-detail tabs use one animated sliding background indicator and remain keyboard-accessible.
 
 ## Study planner
@@ -84,6 +88,6 @@
 ## Client-side routes
 
 - Every screen in the goal-setting flow must have its own URL path and physical static entry point so direct links, refreshes, and browser history work without a server fallback.
-- Use `/goals/`, `/work-experience/`, `/job-expectations/`, `/success/`, `/my-goals/`, and `/study-goal/` for the current flow.
+- Use `/goals/`, `/work-experience/`, `/job-expectations/`, `/success/`, `/my-goals/`, `/study-goal/`, and `/profile/` for the current flow.
 - Navigate through the shared `renderScreen()` function so page transitions remain consistent.
 - Browser back and forward navigation must render through the same page-background fade while persistent navigation remains visible.

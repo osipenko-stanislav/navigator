@@ -59,13 +59,16 @@ export function chipControl({ label, selected = false, attributes: extraAttribut
   })
 }
 
-export function fieldControl({ id, label, placeholder, options, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, dateIconContent = '', clearIconContent = '' }) {
+export function fieldControl({ id, label, placeholder, options, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
   const validation = required ? ' required' : ''
   const error = errorMessage || 'Заполни поле'
   const extraAttributes = attributes(inputAttributes)
   const disabled = /(^|\s)disabled(\s|$)/.test(inputAttributes)
   const classes = ['ui-field', className].filter(Boolean).join(' ')
   const safeValue = escapeAttribute(value)
+  const normalizedOptions = options?.map((option) => typeof option === 'object'
+    ? { value: String(option.value), label: String(option.label) }
+    : { value: String(option), label: String(option) })
 
   if (type === 'date') {
     const displayValue = formatDateValue(value)
@@ -96,21 +99,23 @@ export function fieldControl({ id, label, placeholder, options, required = true,
   }
 
   if (options) {
+    const selectedOption = normalizedOptions.find((option) => option.value === String(value))
+    const displayValue = selectedOption?.label || ''
     return `
       <div class="${classes}" data-ui-select="${id}">
         <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
         <span class="ui-field__control ui-field__control--select">
           <select class="visually-hidden" id="${id}" name="${id}" data-ui-field${validation}${extraAttributes} tabindex="-1" aria-hidden="true">
             <option value="" ${value ? '' : 'selected'} disabled>${placeholder}</option>
-            ${options.map((option) => `<option value="${option}" ${option === value ? 'selected' : ''}>${option}</option>`).join('')}
+            ${normalizedOptions.map((option) => `<option value="${escapeAttribute(option.value)}" ${option.value === String(value) ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`).join('')}
           </select>
           ${controlButton({
             className: 'ui-select__trigger',
-            content: `<span class="${value ? '' : 'is-placeholder'}">${value || placeholder}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
+            content: `<span class="${displayValue ? '' : 'is-placeholder'}">${escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
             attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}"${disabled ? ' disabled' : ''}`,
           })}
           <span class="ui-select__options" id="${id}-options" role="listbox" aria-labelledby="${id}-label" hidden>
-            ${options.map((option) => controlButton({ className: `ui-select__option ${option === value ? 'is-selected' : ''}`, content: option, attributes: `role="option" aria-selected="${option === value}" data-ui-select-option="${id}" data-value="${escapeAttribute(option)}"` })).join('')}
+            ${normalizedOptions.map((option) => controlButton({ className: `ui-select__option ${option.value === String(value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${option.value === String(value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
           </span>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
@@ -121,7 +126,8 @@ export function fieldControl({ id, label, placeholder, options, required = true,
     return `
       <label class="${classes}" for="${id}">
         <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}">${label}</span>
-        <span class="ui-field__control ui-field__control--textarea">
+        <span class="ui-field__control ui-field__control--textarea ${toolbarContent ? 'ui-field__control--with-toolbar' : ''}">
+          ${toolbarContent ? `<span class="ui-field__toolbar">${toolbarContent}</span>` : ''}
           <textarea id="${id}" name="${id}" placeholder="${placeholder}" data-ui-field${validation}${extraAttributes}>${safeValue}</textarea>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
@@ -137,6 +143,26 @@ export function fieldControl({ id, label, placeholder, options, required = true,
       </span>
       <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
     </label>`
+}
+
+export function fileControl({ id, label, file = null, inputAttributes = '', checkContent = '', clearContent = '' }) {
+  const fileName = file?.name ? escapeAttribute(file.name) : ''
+
+  return `
+    <div class="ui-file-field" data-file-control="${id}">
+      <span class="ui-field__label" id="${id}-label">${label}</span>
+      <label class="ui-file-field__drop" for="${id}" data-file-drop="${id}">
+        <input class="visually-hidden" id="${id}" name="${id}" type="file" accept=".jpg,.jpeg,.png,.pdf" aria-labelledby="${id}-label ${id}-prompt" data-profile-file="${id}"${attributes(inputAttributes)}>
+        <span id="${id}-prompt">Выбери файл или перетяни их сюда</span>
+      </label>
+      <div class="ui-file-field__selected" data-file-selected="${id}" ${fileName ? '' : 'hidden'}>
+        <span class="ui-file-field__status" aria-hidden="true">${checkContent}</span>
+        <span class="ui-file-field__name" data-file-name>${fileName}</span>
+        ${controlButton({ className: 'ui-file-field__clear', content: clearContent, attributes: `aria-label="Удалить файл" data-file-clear="${id}"` })}
+      </div>
+      <span class="ui-file-field__helper">Файлы форматов jpg, png и pdf, не более 5 МБ</span>
+      <span class="ui-field__error" id="${id}-error" aria-live="polite"></span>
+    </div>`
 }
 
 export function tabControl({ id, label, active = false }) {
