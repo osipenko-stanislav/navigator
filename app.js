@@ -243,31 +243,37 @@ function normalizeApplicationSalary(value = '') {
   return CAREER_SALARY_OPTIONS[3]
 }
 
+function previousApplicationDate(daysAgo) {
+  const date = new Date()
+  date.setDate(date.getDate() - daysAgo)
+  return applicationDateValue(date)
+}
+
 const defaultApplications = [
-  ['Яндекс', 'ML Engineer Intern', CAREER_SALARY_OPTIONS[1], 'Новый'],
-  ['Т-Банк', 'Data Analyst', CAREER_SALARY_OPTIONS[2], 'Оффер'],
-  ['Ozon Tech', 'Backend Developer', '—', 'Интервью'],
-  ['Яндекс', 'Research ML', CAREER_SALARY_OPTIONS[1], 'Оффер'],
-  ['Т-Банк', 'Product Analyst', CAREER_SALARY_OPTIONS[2], 'Отказ'],
-  ['Ozon Tech', 'UX Researcher', CAREER_SALARY_OPTIONS[1], 'На рассмотрении'],
-  ['Яндекс', 'Frontend Developer', '—', 'Отказ'],
-  ['Т-Банк', 'QA Engineer', CAREER_SALARY_OPTIONS[1], 'Тестовое'],
-  ['Ozon Tech', 'Product Manager', CAREER_SALARY_OPTIONS[2], 'Тех. собес'],
-  ['Яндекс', 'Data Engineer', '—', 'Новый'],
-  ['Lamoda Tech', 'Продуктовый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', '2026-06-10'],
-  ['Сбер', 'Frontend-разработчик', CAREER_SALARY_OPTIONS[2], 'Интервью', '2026-06-09'],
-  ['Альфа-Банк', 'Java-разработчик', CAREER_SALARY_OPTIONS[2], 'Тестовое', '2026-06-08'],
-  ['МТС', 'Data Engineer', CAREER_SALARY_OPTIONS[1], 'Тех. собес', '2026-06-07'],
-  ['Циан', 'UX/UI-дизайнер', CAREER_SALARY_OPTIONS[1], 'Новый', '2026-06-06'],
-  ['VK Tech', 'Python-разработчик', CAREER_SALARY_OPTIONS[2], 'Оффер', '2026-06-05'],
-  ['Райффайзен Банк', 'Бизнес-аналитик', CAREER_SALARY_OPTIONS[1], 'В архиве', '2026-06-04'],
-  ['Туту', 'Маркетинговый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', '2026-06-03'],
-  ['СДЭК', 'QA-инженер', CAREER_SALARY_OPTIONS[1], 'Отказ', '2026-06-02'],
-  ['Лемана ПРО', 'BI-аналитик', CAREER_SALARY_OPTIONS[2], 'Интервью', '2026-06-01'],
-  ['Билайн', 'Инженер по тестированию', CAREER_SALARY_OPTIONS[1], 'Тестовое', '2026-05-31'],
-  ['Яндекс Пэй', 'Системный аналитик', CAREER_SALARY_OPTIONS[2], 'Новый', '2026-05-30'],
-].map(([company, position, salary, status, date = '2026-06-11'], index) => ({
-  id: `demo-${index + 1}`, internal: index < 3, vacancyId: null, company, date, status, position, salary,
+  ['Яндекс', 'ML Engineer Intern', CAREER_SALARY_OPTIONS[1], 'Новый', 1],
+  ['Т-Банк', 'Data Analyst', CAREER_SALARY_OPTIONS[2], 'Оффер', 3],
+  ['Ozon Tech', 'Backend Developer', '—', 'Интервью', 6],
+  ['Яндекс', 'Research ML', CAREER_SALARY_OPTIONS[1], 'Оффер', 9],
+  ['Т-Банк', 'Product Analyst', CAREER_SALARY_OPTIONS[2], 'Отказ', 13],
+  ['Ozon Tech', 'UX Researcher', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 16],
+  ['Яндекс', 'Frontend Developer', '—', 'Отказ', 20],
+  ['Т-Банк', 'QA Engineer', CAREER_SALARY_OPTIONS[1], 'Тестовое', 24],
+  ['Ozon Tech', 'Product Manager', CAREER_SALARY_OPTIONS[2], 'Тех. собес', 29],
+  ['Яндекс', 'Data Engineer', '—', 'Новый', 33],
+  ['Lamoda Tech', 'Продуктовый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 38],
+  ['Сбер', 'Frontend-разработчик', CAREER_SALARY_OPTIONS[2], 'Интервью', 42],
+  ['Альфа-Банк', 'Java-разработчик', CAREER_SALARY_OPTIONS[2], 'Тестовое', 47],
+  ['МТС', 'Data Engineer', CAREER_SALARY_OPTIONS[1], 'Тех. собес', 53],
+  ['Циан', 'UX/UI-дизайнер', CAREER_SALARY_OPTIONS[1], 'Новый', 58],
+  ['VK Tech', 'Python-разработчик', CAREER_SALARY_OPTIONS[2], 'Оффер', 64],
+  ['Райффайзен Банк', 'Бизнес-аналитик', CAREER_SALARY_OPTIONS[1], 'В архиве', 69],
+  ['Туту', 'Маркетинговый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 75],
+  ['СДЭК', 'QA-инженер', CAREER_SALARY_OPTIONS[1], 'Отказ', 82],
+  ['Лемана ПРО', 'BI-аналитик', CAREER_SALARY_OPTIONS[2], 'Интервью', 88],
+  ['Билайн', 'Инженер по тестированию', CAREER_SALARY_OPTIONS[1], 'Тестовое', 95],
+  ['Яндекс Пэй', 'Системный аналитик', CAREER_SALARY_OPTIONS[2], 'Новый', 103],
+].map(([company, position, salary, status, daysAgo], index) => ({
+  id: `demo-${index + 1}`, internal: index < 3, vacancyId: null, company, date: previousApplicationDate(daysAgo), status, position, salary,
   source: index < 3 ? 'ЦУ' : 'Внешний источник', link: '', contact: '', notes: '',
 }))
 
@@ -277,8 +283,18 @@ function getApplications() {
     const source = Array.isArray(saved)
       ? [...saved, ...defaultApplications.filter((item) => !saved.some((savedItem) => savedItem.id === item.id))]
       : defaultApplications
-    return source
-      .map((item) => ({ ...item, salary: normalizeApplicationSalary(item.salary) }))
+    const result = source
+      .map((item) => {
+        const demoIndex = defaultApplications.findIndex((demo) => demo.id === item.id)
+        const legacyDate = applicationDateValue(new Date(2026, 5, 11 - Math.max(0, demoIndex - 9)))
+        return {
+          ...item,
+          date: demoIndex >= 0 && item.date === legacyDate ? defaultApplications[demoIndex].date : item.date,
+          salary: normalizeApplicationSalary(item.salary),
+        }
+      })
+    try { window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(result)) } catch { /* Keep the session interactive. */ }
+    return result
   } catch {
     return defaultApplications
   }
@@ -1804,7 +1820,7 @@ function renderApplicationsPanel({ focusSelector } = {}) {
 
 function openApplicationDrawer(application = null) {
   const item = application || {
-    id: `external-${Date.now()}`, internal: false, company: '', date: new Date().toISOString().slice(0, 10), status: 'Новый',
+    id: `external-${Date.now()}`, internal: false, company: '', date: applicationDateValue(new Date()), status: 'Новый',
     position: '', salary: '', source: 'Внешний источник', link: '', contact: '', notes: '',
   }
   editingApplicationId = application?.id || null
@@ -3654,7 +3670,7 @@ root.addEventListener('submit', (event) => {
       internal: true,
       vacancyId,
       company: vacancy.company,
-      date: new Date().toISOString().slice(0, 10),
+      date: applicationDateValue(new Date()),
       status: 'Новый',
       position: vacancy.title,
       salary: normalizeApplicationSalary(vacancy.salary),
