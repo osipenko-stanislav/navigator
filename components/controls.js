@@ -17,15 +17,27 @@ function formatDateValue(value = '') {
   return `${day}.${month}.${year.slice(-2)}`
 }
 
-export function controlButton({ content, className = '', variant = '', type = 'button', attributes: extraAttributes = '' }) {
+export function controlButton({ content, className = '', variant = '', size = '', type = 'button', href = '', target = '', attributes: extraAttributes = '' }) {
   const variantClasses = {
     flat: 'flat-button flat-button--neutral',
+    'flat-outline': 'flat-button flat-button--outline',
     'flat-destructive': 'flat-button flat-button--destructive',
+    'flat-icon': 'flat-button flat-button--neutral ui-button-icon',
+    'flat-icon-destructive': 'flat-button flat-button--destructive ui-button-icon',
     'context-trigger': 'ui-context-trigger',
   }
-  const classes = [...new Set(`${variantClasses[variant] || ''} ${className}`.trim().split(/\s+/))].filter(Boolean).join(' ')
+  const classes = [...new Set(`${variantClasses[variant] || ''} ${size === 'compact' ? 'ui-button--compact' : ''} ${className}`.trim().split(/\s+/))].filter(Boolean).join(' ')
   const classAttribute = classes ? ` class="${classes}"` : ''
+  if (href) {
+    const targetAttribute = target ? ` target="${escapeAttribute(target)}"` : ''
+    const relAttribute = target === '_blank' ? ' rel="noopener noreferrer"' : ''
+    return `<a${classAttribute} href="${escapeAttribute(href)}"${targetAttribute}${relAttribute}${attributes(extraAttributes)}>${content}</a>`
+  }
   return `<button${classAttribute} type="${type}"${attributes(extraAttributes)}>${content}</button>`
+}
+
+export function linkControl({ href, label, className = '', attributes: extraAttributes = '' }) {
+  return `<a href="${escapeAttribute(href)}"${className ? ` class="${escapeAttribute(className)}"` : ''}${attributes(extraAttributes)}>${escapeAttribute(label)}</a>`
 }
 
 export function contextMenuControl({ id, label, items }) {

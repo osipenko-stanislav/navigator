@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=20'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=25'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -31,6 +31,13 @@ const SHOW_GOAL_INFO_DIALOG = false
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
 const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', '200 000–300 000', 'Более 300 000']
+const VACANCY_SALARY_OPTIONS = [
+  { value: '0', label: 'Не важна' },
+  ...[50000, 100000, 150000, 200000, 300000].map((amount) => ({
+    value: String(amount),
+    label: `${amount.toLocaleString('ru-RU')} ₽`,
+  })),
+]
 const APPLICATION_STATUSES = ['Новый', 'На рассмотрении', 'Интервью', 'Тестовое', 'Тех. собес', 'Оффер', 'Отказ', 'В архиве']
 
 const studyStages = [
@@ -92,9 +99,9 @@ const industryStages = [
     title: 'Онбординг',
     description: 'Знакомство с карьерными возможностями и выбор следующих шагов',
     tasks: [
-      ['Узнать, какие возможности у меня есть', 'Изучи материалы карьерного трека в хэндбуке'],
-      ['Подписаться на карьерный канал', 'Следи за мероприятиями и вакансиями компаний-партнёров'],
-      ['Узнать, какие шаги делать дальше', 'Запишись на консультацию и обсуди свою карьерную ситуацию'],
+      ['Узнать, какие возможности у меня есть', 'Изучи материалы карьерного трека в хэндбуке', { label: 'Открыть хэндбук' }],
+      ['Подписаться на карьерный канал', 'Следи за мероприятиями и вакансиями компаний-партнёров', { label: 'Открыть канал' }],
+      ['Узнать, какие шаги делать дальше', 'Запишись на консультацию и обсуди свою карьерную ситуацию', { label: 'Записаться' }],
     ],
   },
   {
@@ -102,13 +109,13 @@ const industryStages = [
     title: 'Подготовка к трудоустройству',
     description: 'Навыки, резюме, интервью и обратная связь от индустрии',
     tasks: [
-      ['Изучить материалы в «Карьерной аптечке»', 'Подготовься к выходу на рынок с помощью материалов ЦУ'],
-      ['Узнать, какие навыки требуются для моей профессии', 'Сверь свои навыки с профилем специалиста'],
-      ['Посетить мероприятие компании-партнёра', 'Выбери подходящее мероприятие в карьерном канале'],
-      ['Записаться на курс «Mock-интервью»', 'Курс поможет системно подготовиться к выходу на рынок труда'],
-      ['Составить резюме с учётом рекомендаций', 'Проверь структуру, содержание и формулировки в резюме'],
-      ['Пройти тренировочное техническое собеседование', 'Сначала составь и провалидируй резюме; повторить собеседование можно через два месяца'],
-      ['Встретиться с экспертом из индустрии', 'Обсуди свою карьерную ситуацию на разовой встрече или серии встреч'],
+      ['Изучить материалы в «Карьерной аптечке»', 'Подготовься к выходу на рынок с помощью материалов ЦУ', { label: 'Открыть аптечку' }],
+      ['Узнать, какие навыки требуются для моей профессии', 'Сверь свои навыки с профилем специалиста', { label: 'Открыть профиль' }],
+      ['Посетить мероприятие компании-партнёра', 'Выбери подходящее мероприятие в карьерном канале', { label: 'Выбрать мероприятие' }],
+      ['Записаться на курс «Mock-интервью»', 'Курс поможет системно подготовиться к выходу на рынок труда', { label: 'Открыть курс' }],
+      ['Составить резюме с учётом рекомендаций', 'Проверь структуру, содержание и формулировки в резюме', { label: 'Добавить резюме', tab: 'portfolio' }],
+      ['Пройти тренировочное техническое собеседование', 'Сначала составь и провалидируй резюме; повторить собеседование можно через два месяца', { label: 'Записаться' }],
+      ['Встретиться с экспертом из индустрии', 'Обсуди свою карьерную ситуацию на разовой встрече или серии встреч', { label: 'Найти эксперта' }],
     ],
   },
   {
@@ -116,8 +123,8 @@ const industryStages = [
     title: 'Практический опыт',
     description: 'Задачи от партнёров и проекты для портфолио',
     tasks: [
-      ['Решить задачу партнёра в рамках буткемпа', 'Буткемп длится одну-две недели и предполагает самостоятельную работу'],
-      ['Пополнить портфолио проектом в Мастерской Test&Learn', 'Мастерская длится четыре месяца: проект выполняет команда студентов'],
+      ['Решить задачу партнёра в рамках буткемпа', 'Буткемп длится одну-две недели и предполагает самостоятельную работу', { label: 'Выбрать буткемп' }],
+      ['Пополнить портфолио проектом в Мастерской Test&Learn', 'Мастерская длится четыре месяца: проект выполняет команда студентов', { label: 'Открыть мастерскую' }],
     ],
   },
   {
@@ -125,9 +132,9 @@ const industryStages = [
     title: 'Трудоустройство',
     description: 'Вакансии партнёров, самостоятельный поиск и персональное сопровождение',
     tasks: [
-      ['Откликнуться на вакансию компании-партнёра', 'Выбери подходящую вакансию на странице карьерных возможностей'],
-      ['Откликнуться на вакансию, найденную самостоятельно', 'Добавь внешний отклик, чтобы отслеживать его вместе с остальными'],
-      ['Передать резюме через «рукопожатие»', 'Доступно после тренировочного технического собеседования'],
+      ['Откликнуться на вакансию компании-партнёра', 'Выбери подходящую вакансию на странице карьерных возможностей', { label: 'Открыть вакансии', tab: 'vacancies' }],
+      ['Откликнуться на вакансию, найденную самостоятельно', 'Добавь внешний отклик, чтобы отслеживать его вместе с остальными', { label: 'Добавить отклик', tab: 'applications', openApplication: true }],
+      ['Передать резюме через «рукопожатие»', 'Доступно после тренировочного технического собеседования', { label: 'Передать резюме' }],
     ],
   },
 ]
@@ -191,6 +198,9 @@ const vacancyDirections = [
   { label: 'Информационная безопасность', value: 'security' },
 ]
 
+const ONBOARDING_SPECIALTY_OPTIONS = vacancyDirections.map(({ label }) => label)
+const normalizeOnboardingSpecialty = (value = '') => value === 'Дизайн' ? 'Дизайн и исследования' : value
+
 const vacancies = vacancySeeds.map(([brandId, title], index) => {
   const [company, logo] = vacancyBrands[brandId]
   const internship = title.startsWith('Стажёр')
@@ -217,6 +227,8 @@ const vacancies = vacancySeeds.map(([brandId, title], index) => {
     logo,
     title,
     salary: internship ? '60 000–90 000 ₽ в месяц' : '100 000–160 000 ₽ в месяц',
+    salaryMin: internship ? 60000 : 100000,
+    salaryMax: internship ? 90000 : 160000,
     level: index % 4 === 0 ? 'Магистратура' : 'Бакалавриат',
     levelTone: index % 4 === 0 ? 'blue' : 'green',
     tags: [city, format, employment, experience, ...(internship ? ['Стажировка'] : [])],
@@ -525,6 +537,7 @@ let plannerCourseMenu = null
 let collapsedCatalogGroups = new Set()
 let openGlossaryTerms = new Set()
 let vacancySearch = ''
+let vacancySalaryFrom = '0'
 let vacancyFavoritesOnly = false
 let vacancyFilters = new Set()
 let vacancyInternships = true
@@ -591,6 +604,13 @@ function plannerSummary() {
   const completed = planned.filter((item) => item.completed).length
   const percent = planned.length ? Math.round((completed / planned.length) * 100) : 0
   return { planned: planned.length, completed, percent }
+}
+
+function getStudySemesterProgress() {
+  const totalSemesters = 8
+  const completedSemesters = Array.from({ length: totalSemesters }, (_, index) => index + 1)
+    .filter((semester) => isPlannerSemesterCompleted(semester)).length
+  return { totalSemesters, completedSemesters, percent: Math.round(completedSemesters / totalSemesters * 100) }
 }
 
 function courseHasConflict(courseId, semester) {
@@ -773,6 +793,21 @@ const externalUrl = (value = '') => {
   return /^(https?:\/\/)/i.test(normalized) ? normalized : `https://${normalized}`
 }
 
+function highlightSearchText(value, query = '') {
+  const text = String(value)
+  const term = query.trim()
+  if (!term) return escapeHTML(text)
+  const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu')
+  let result = ''
+  let offset = 0
+  for (const match of text.matchAll(pattern)) {
+    result += escapeHTML(text.slice(offset, match.index))
+      + `<mark class="search-highlight">${escapeHTML(match[0])}</mark>`
+    offset = match.index + match[0].length
+  }
+  return result + escapeHTML(text.slice(offset))
+}
+
 function badge(content) {
   return `<span class="badge badge--outline">${content}</span>`
 }
@@ -867,7 +902,7 @@ function headerIsland() {
           <p>Если сложно сформулировать ее самостоятельно — начни с консультации.</p>
         </div>
         <div class="header-island__actions">
-          ${controlButton({ className: 'flat-button flat-button--primary header-island__consultation-action', content: `${icon('message-chat-square.svg', 20)}<span>Хочу консультацию</span>` })}
+          ${controlButton({ className: 'flat-button flat-button--outline header-island__consultation-action', content: `${icon('message-chat-square.svg', 20)}<span>Хочу консультацию</span>` })}
           ${getOnboarding().completed ? controlButton({ variant: 'flat', content: 'Редактировать данные', attributes: 'data-edit-onboarding' }) : ''}
         </div>
       </div>
@@ -894,17 +929,22 @@ function navigatorGoalsHeader() {
     </section>`
 }
 
-function goalCard(goal) {
+function goalCardState(goal) {
   const savedGoals = getSavedGoals()
   const draft = getGoalSelection()
   const selected = savedGoals.some((item) => item.id === goal.id) || draft.includes(goal.id)
   const trackAlreadyUsed = savedGoals.some((item) => item.kind === goal.kind) || draft.some((id) => id !== goal.id && goals.find((item) => item.id === id)?.kind === goal.kind)
   const unavailable = goal.comingSoon || trackAlreadyUsed || (!selected && savedGoals.length + draft.length >= MAX_GOALS) || savedGoals.some((item) => item.id === goal.id)
+  return { selected, unavailable: Boolean(unavailable) }
+}
+
+function goalCard(goal) {
+  const { selected, unavailable } = goalCardState(goal)
   return controlButton({
     className: `goal-card ${selected ? 'goal-card--selected' : ''}`,
     attributes: `aria-pressed="${selected}" data-goal-id="${goal.id}" ${unavailable ? `disabled ${goal.comingSoon ? `aria-describedby="${goal.id}-state"` : ''}` : ''}`,
     content: `<span class="goal-card__heading">
-        <span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(selected ? 'check-verified.svg' : iconByKind[goal.kind])}</span>
+        <span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(iconByKind[goal.kind], 18, 'icon goal-card__icon-default')}${icon('check-verified.svg', 18, 'icon goal-card__icon-selected')}</span>
         <span class="goal-card__category">${goal.category}</span>
         ${goal.comingSoon ? badge(`<span id="${goal.id}-state">Готовим</span>`) : ''}
       </span>
@@ -1015,7 +1055,7 @@ function workExperienceTemplate() {
             <div class="work-form__fields">
               ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-work ${values.noWork ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
               ${fieldControl({ id: 'company', label: 'Компания*', placeholder: 'Название компании', value: values.company || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
-              ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: values.specialty || '', inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
+              ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: normalizeOnboardingSpecialty(values.specialty), inputAttributes: fieldsDisabled, options: ONBOARDING_SPECIALTY_OPTIONS, errorMessage: 'Выбери специальность' })}
               ${fieldControl({ id: 'grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.grade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
               ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.salary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
@@ -1074,7 +1114,7 @@ function jobExpectationsTemplate() {
             <div class="work-form__fields">
               ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не знаю</span>' })}
               ${fieldControl({ id: 'desired-company', label: 'В каких компаниях хочешь работать*', placeholder: 'Названия компаний', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи хотя бы одну компанию' })}
-              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: values.desiredSpecialty || [], multiple: true, checkContent: icon('check-small.svg', 16), inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери хотя бы одну специальность' })}
+              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: (values.desiredSpecialty || []).map(normalizeOnboardingSpecialty), multiple: true, checkContent: icon('check-small.svg', 16), inputAttributes: fieldsDisabled, options: ONBOARDING_SPECIALTY_OPTIONS, errorMessage: 'Выбери хотя бы одну специальность' })}
               ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.desiredGrade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
               ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.desiredSalary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
@@ -1154,6 +1194,16 @@ function studyStageTemplate(stage, stageIndex, progress) {
     </article>`
 }
 
+function industryTaskUrl(action) {
+  if (action.href) return action.href
+  if (!action.tab) return ''
+  const url = new URL('study-goal/', APP_ROOT_URL)
+  url.searchParams.set('view', 'industry')
+  url.searchParams.set('tab', action.tab)
+  if (action.openApplication) url.searchParams.set('action', 'add-application')
+  return url.href
+}
+
 function industryStageTemplate(stage, stageIndex, progress) {
   const completed = stage.tasks.filter((_, taskIndex) => progress.has(`${stage.id}-${taskIndex}`)).length
   const expanded = stageIndex === 0
@@ -1180,14 +1230,27 @@ function industryStageTemplate(stage, stageIndex, progress) {
       <div class="study-stage__panel" id="industry-stage-panel-${stage.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
         <div class="study-stage__panel-inner">
           <div class="study-stage__tasks">
-            ${stage.tasks.map(([title, description], taskIndex) => {
+            ${stage.tasks.map(([title, description, action], taskIndex) => {
               const taskId = `${stage.id}-${taskIndex}`
-              return checkboxControl({
-                className: 'study-task',
-                inputAttributes: `data-industry-task value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
-                boxContent: icon('check-small.svg', 20),
-                content: `<span class="study-task__copy"><strong>${title}</strong><span>${description}</span></span>`,
-              })
+              const actionUrl = action ? industryTaskUrl(action) : ''
+              return `<div class="study-task industry-task">
+                ${checkboxControl({
+                  className: 'industry-task__check',
+                  inputAttributes: `data-industry-task value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
+                  boxContent: icon('check-small.svg', 20),
+                  content: `<span class="study-task__copy"><strong>${title}</strong><span>${description}</span></span>`,
+                })}
+                ${action ? `<span class="industry-task__action-wrap">${controlButton({
+                  variant: 'flat-outline',
+                  className: 'industry-task__action',
+                  content: escapeHTML(action.label),
+                  href: actionUrl,
+                  target: '_blank',
+                  attributes: actionUrl
+                    ? `aria-label="${escapeHTML(`${action.label}: ${title}. Откроется в новой вкладке`)}"`
+                    : `data-industry-task-pending aria-controls="industry-task-tooltip-${taskId}" aria-label="${escapeHTML(`${action.label}: ${title}`)}"`,
+                })}${actionUrl ? '' : `<span class="industry-task__tooltip" id="industry-task-tooltip-${taskId}" role="tooltip" aria-live="polite" hidden>Готовим</span>`}</span>` : ''}
+              </div>`
             }).join('')}
           </div>
         </div>
@@ -1264,13 +1327,13 @@ function courseCardToolbar(course, semester) {
     })
 }
 
-function courseCardContent(course, { completed = false, conflict = false } = {}) {
+function courseCardContent(course, { completed = false, conflict = false, searchQuery = '' } = {}) {
   const postrequisiteCount = plannerCourses.filter((candidate) => candidate.prerequisites.includes(course.id)).length
   const requisiteCount = course.prerequisiteNames.length + course.corequisiteNames.length + postrequisiteCount
 
   return `<span class="planner-course__content">
     <span class="planner-course__heading-line">
-      <span class="planner-course__title">${course.title}</span>
+      <span class="planner-course__title">${highlightSearchText(course.title, searchQuery)}</span>
     </span>
     <span class="planner-course__tags">
       ${completed ? completedCourseBadge() : ''}
@@ -1278,6 +1341,7 @@ function courseCardContent(course, { completed = false, conflict = false } = {})
       <span class="planner-course__tag">Семестры: ${course.available.join(', ')}</span>
       ${requisiteCount ? `<span class="planner-course__tag">Реквизиты: ${requisiteCount}</span>` : ''}
     </span>
+    ${searchQuery.trim() && course.description.toLowerCase().includes(searchQuery.trim().toLowerCase()) ? `<span class="planner-course__search-description">${highlightSearchText(course.description, searchQuery)}</span>` : ''}
     ${conflict ? '<span class="planner-course__conflict-note" role="status">Проверь пререквизиты и доступность курса</span>' : ''}
   </span>`
 }
@@ -1291,7 +1355,7 @@ function catalogCourseCard(course) {
       ${controlButton({
         className: 'planner-course__open catalog-course-card__open',
         attributes: `aria-label="Подробнее о курсе «${course.title}»" data-catalog-course-open="${course.id}"`,
-        content: courseCardContent(course, { completed }),
+        content: courseCardContent(course, { completed, searchQuery: catalogSearch }),
       })}
     </article>`
 }
@@ -1313,7 +1377,7 @@ function catalogTemplate() {
         <div class="catalog-filter-bar">
           ${courseFilterControls({ prefix: 'catalog', filters, openFilter: catalogFilterOpen })}
           ${catalogSearch || catalogDirections.size || catalogSemesters.size || catalogCategories.size || catalogWorkloads.size || catalogRequisites.size || catalogStatuses.size
-            ? controlButton({ variant: 'flat', className: 'catalog__reset', content: 'Сбросить', attributes: 'data-catalog-reset' })
+            ? controlButton({ variant: 'flat', size: 'compact', className: 'catalog__reset', content: 'Сбросить', attributes: 'data-catalog-reset' })
             : ''}
         </div>
       </div>
@@ -1401,7 +1465,7 @@ function plannerAvailableCoursesTemplate(semester) {
   return `<div class="planner-available-courses">
     <div class="catalog-filter-bar planner-available-filters" aria-label="Фильтры доступных курсов ${semester}-го семестра">
       ${courseFilterControls({ prefix: `planner-available-${semester}`, filters, openFilter, semester })}
-      ${hasFilters ? controlButton({ variant: 'flat', className: 'catalog__reset', content: 'Сбросить', attributes: `data-planner-filter-reset="${semester}"` }) : ''}
+      ${hasFilters ? controlButton({ variant: 'flat', size: 'compact', className: 'catalog__reset', content: 'Сбросить', attributes: `data-planner-filter-reset="${semester}"` }) : ''}
     </div>
     <div class="planner-course-grid planner-available-grid" aria-live="polite">
       ${available.length ? available.map((course) => `
@@ -1502,6 +1566,7 @@ function plannerSemesterTemplate(semester) {
 
 function plannerTemplate() {
   const statisticsExpanded = !plannerState.statisticsCollapsed
+  const semesterProgress = getStudySemesterProgress()
   return `
     <section class="planner" aria-labelledby="planner-title">
       <h2 class="visually-hidden" id="planner-title">Планировщик</h2>
@@ -1522,7 +1587,7 @@ function plannerTemplate() {
         <div class="planner-semesters-heading">
           <div class="planner-semesters-heading__title">
             <h3>Семестры</h3>
-            <span class="badge badge--positive">${icon('check-verified.svg', 16)}2 из 3 семестров завершено</span>
+            <span class="badge badge--positive">${icon('check-verified.svg', 16)}${semesterProgress.completedSemesters} из ${semesterProgress.totalSemesters} семестров завершено</span>
           </div>
           <div class="planner__primary-actions">
             ${controlButton({ className: 'flat-button flat-button--outline planner-trajectory-button', content: `${icon('stars.svg', 20)}<span>Подобрать траекторию</span>`, attributes: 'data-planner-trajectory' })}
@@ -1607,7 +1672,11 @@ function studyGoalTemplate() {
     </div>`
 }
 
-function vacancyCardTemplate(vacancy, { openable = true } = {}) {
+function favoriteIcon() {
+  return `<span class="favorite-icon">${icon('heart.svg', 20, 'icon favorite-icon__outline')}${icon('heart-filled.svg', 20, 'icon favorite-icon__filled')}</span>`
+}
+
+function vacancyCardTemplate(vacancy, { openable = true, searchQuery = '' } = {}) {
   const favorite = vacancyState.favorites.has(vacancy.id)
   const applied = vacancyState.applied.has(vacancy.id)
 
@@ -1616,13 +1685,13 @@ function vacancyCardTemplate(vacancy, { openable = true } = {}) {
       ${openable ? controlButton({ className: 'vacancy-card__open', content: '', attributes: `aria-label="Открыть вакансию «${vacancy.title}»" data-vacancy-open="${vacancy.id}"` }) : ''}
       <header class="vacancy-card__company">
         <span class="vacancy-logo"><img src="${ASSET}${vacancy.logo}" alt=""></span>
-        <span>${vacancy.company}</span>
+        <span>${highlightSearchText(vacancy.company, searchQuery)}</span>
         ${vacancy.level ? `<span class="vacancy-card__level vacancy-card__level--${vacancy.levelTone}">${vacancy.level}</span>` : ''}
       </header>
       <div class="vacancy-card__copy">
-        <h3>${vacancy.title}</h3>
+        <h3>${highlightSearchText(vacancy.title, searchQuery)}</h3>
         <strong>${vacancy.salary}</strong>
-        <p>${vacancy.description}</p>
+        <p>${highlightSearchText(vacancy.description, searchQuery)}</p>
       </div>
       <div class="vacancy-card__tags">${vacancy.tags.map((tag) => `<span>${tag}</span>`).join('')}</div>
       <footer class="vacancy-card__footer">
@@ -1634,7 +1703,7 @@ function vacancyCardTemplate(vacancy, { openable = true } = {}) {
           })}
           ${controlButton({
             className: `vacancy-card__favorite ${favorite ? 'is-active' : ''}`,
-            content: icon(favorite ? 'heart-filled.svg' : 'heart.svg', 20),
+            content: favoriteIcon(),
             attributes: `aria-pressed="${favorite}" aria-label="${favorite ? 'Удалить из избранного' : 'Добавить в избранное'}" data-vacancy-favorite="${vacancy.id}"`,
           })}
         </div>
@@ -1711,10 +1780,10 @@ function openVacancyApplicationDialog(vacancy) {
             ${checkboxControl({
               className: 'vacancy-apply-consent__control',
               inputAttributes: 'required data-vacancy-application-consent aria-describedby="vacancy-application-consent-error"',
-              boxContent: icon('check-small.svg', 20),
-              content: '<span>Я согласен с пользовательским соглашением</span>',
+              boxContent: icon('check-small.svg', 16),
+              content: `<span class="vacancy-apply-offer">Ознакомлен с ${linkControl({ href: 'https://cu.ru/oferta', label: 'офертой', attributes: 'target="_blank" rel="noopener noreferrer"' })}</span>`,
             })}
-            <span class="vacancy-apply-consent__error" id="vacancy-application-consent-error" aria-live="polite">Подтверди согласие</span>
+            <span class="vacancy-apply-consent__error" id="vacancy-application-consent-error" aria-live="polite">Подтверди ознакомление с офертой</span>
           </div>
         </div>
         <div class="goal-dialog__actions">
@@ -1814,6 +1883,7 @@ function vacanciesTemplate() {
     return (!query || searchable.includes(query))
       && (!vacancySelectedDirections.size || vacancySelectedDirections.has(vacancy.direction))
       && (!vacancyFavoritesOnly || vacancyState.favorites.has(vacancy.id))
+      && (!Number(vacancySalaryFrom) || vacancy.salaryMax >= Number(vacancySalaryFrom))
       && selectedByGroup.every((selected) => !selected.length || selected.some((filter) => facets.has(filter)))
       && (vacancyInternships || !vacancy.tags.includes('Стажировка'))
   })
@@ -1826,9 +1896,9 @@ function vacanciesTemplate() {
       <div class="vacancies-main">
         <div class="vacancy-search">
           ${fieldControl({ id: 'vacancy-search', label: 'Поиск вакансий', hideLabel: true, placeholder: 'Поиск', required: false, value: vacancySearch, className: 'input-search', leadingContent: icon('search.svg', 20), inputAttributes: 'data-vacancy-search autocomplete="off"' })}
-          ${controlButton({ className: `vacancy-search__favorite ${vacancyFavoritesOnly ? 'is-active' : ''}`, content: icon(vacancyFavoritesOnly ? 'heart-filled.svg' : 'heart.svg', 20), attributes: `aria-pressed="${vacancyFavoritesOnly}" aria-label="${vacancyFavoritesOnly ? 'Показать все вакансии' : 'Показать только избранное'}" data-vacancy-favorites-only` })}
+          ${controlButton({ className: `vacancy-search__favorite ${vacancyFavoritesOnly ? 'is-active' : ''}`, content: favoriteIcon(), attributes: `aria-pressed="${vacancyFavoritesOnly}" aria-label="${vacancyFavoritesOnly ? 'Показать все вакансии' : 'Показать только избранное'}" data-vacancy-favorites-only` })}
         </div>
-        ${filtered.length ? `<div class="vacancy-grid">${pageItems.map(vacancyCardTemplate).join('')}</div>
+        ${filtered.length ? `<div class="vacancy-grid">${pageItems.map((vacancy) => vacancyCardTemplate(vacancy, { searchQuery: vacancySearch })).join('')}</div>
           <nav class="vacancy-pagination" aria-label="Страницы вакансий">
             ${controlButton({ className: 'vacancy-pagination__arrow', content: icon('chevron-up.svg', 18), attributes: `aria-label="Предыдущая страница" data-vacancy-page="${vacancyPage - 1}" ${vacancyPage === 1 ? 'disabled' : ''}` })}
             ${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => controlButton({ className: `vacancy-pagination__page ${page === vacancyPage ? 'is-current' : ''}`, content: String(page), attributes: `aria-label="Страница ${page}" ${page === vacancyPage ? 'aria-current="page"' : ''} data-vacancy-page="${page}"` })).join('')}
@@ -1843,7 +1913,7 @@ function vacanciesTemplate() {
           const [label, value] = Array.isArray(item) ? item : [item, item]
           return chipControl({ label, selected: vacancyFilters.has(value), attributes: `data-vacancy-filter="${value}"` })
         }).join('')}</div></div>`).join('')}
-        ${fieldControl({ id: 'vacancy-salary', label: 'Зарплата от', placeholder: 'Не важна', options: CAREER_SALARY_OPTIONS, required: false })}
+        ${fieldControl({ id: 'vacancy-salary', label: 'Зарплата от', placeholder: 'Не важна', options: VACANCY_SALARY_OPTIONS, value: vacancySalaryFrom, inputAttributes: 'data-vacancy-salary', required: false })}
         ${checkboxControl({ className: 'vacancy-internships', inputAttributes: `data-vacancy-internships ${vacancyInternships ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span><strong>Рассматриваю стажировки</strong><small>Интересные проекты с возможностью остаться в штате компании</small></span>' })}
         ${controlButton({ className: 'vacancy-filters__reset', content: 'Сбросить', attributes: 'data-vacancy-reset' })}
       </aside>
@@ -1894,7 +1964,7 @@ function applicationsTemplate() {
           ${applicationFilterControl('position', 'Должность', filterValues.position)}
           ${applicationFilterControl('salary', 'Зарплата', filterValues.salary)}
         </div>
-        ${hasFilters ? controlButton({ variant: 'flat', className: 'applications-filter-reset', content: `${icon('application-filter-reset.svg', 18)}<span>Сбросить</span>`, attributes: 'data-application-filter-reset' }) : ''}
+        ${hasFilters ? controlButton({ variant: 'flat', size: 'compact', className: 'applications-filter-reset', content: `${icon('application-filter-reset.svg', 18)}<span>Сбросить</span>`, attributes: 'data-application-filter-reset' }) : ''}
       </div>
       ${controlButton({ className: 'applications-add', content: `${icon('planner-plus.svg', 20)}<span>Внешний отклик</span>`, attributes: 'data-application-add' })}
     </div>
@@ -2017,9 +2087,7 @@ function portfolioPreparationPanel() {
         <p>Обратись к консультанту — он поможет составить резюме и портфолио под твою специальность с учётом твоего опыта и навыков.</p>
         <img src="${ASSET}portfolio-preparation.png" width="275" height="146" alt="">
       </div>
-      <div class="portfolio-preparation__rule">
-        ${controlButton({ className: 'flat-button flat-button--neutral portfolio-preparation__action', content: 'Получить консультацию' })}
-      </div>
+      ${controlButton({ variant: 'flat', className: 'help-card__action portfolio-preparation__action', content: 'Получить консультацию' })}
     </aside>`
 }
 
@@ -2183,7 +2251,7 @@ function goalDetailActions(kind) {
 
   return `<div class="study-goal-shell__actions">
     ${controlButton({ variant: 'flat-destructive', className: 'study-goal-shell__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
-    ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать данные', attributes: `data-edit-current-goal="${goal.id}"` })}
+    ${kind === 'industry' ? '' : controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать данные', attributes: `data-edit-current-goal="${goal.id}"` })}
   </div>`
 }
 
@@ -2289,15 +2357,16 @@ function industryGoalTemplate() {
 function savedGoalCard(goal) {
   const track = goal.kind === 'study' ? 'Учеба' : 'Индустрия'
   const title = goal.kind === 'study' ? 'Хочу учиться' : goal.title
-  const summary = goal.kind === 'study' ? getStudyProgressSummary() : getIndustryProgressSummary()
-  const stageCount = goal.kind === 'study' ? studyStages.length : industryStages.length
+  const summary = goal.kind === 'study' ? getStudySemesterProgress() : getIndustryProgressSummary()
+  const stageCount = goal.kind === 'study' ? summary.totalSemesters : industryStages.length
+  const completedCount = goal.kind === 'study' ? summary.completedSemesters : summary.completedStages
 
   return `
     <article class="saved-goal">
       <header class="saved-goal__header">
         <div class="saved-goal__meta">
           <h3>${track}</h3>
-          <span class="badge badge--positive">${icon('check-verified.svg', 16)}${summary.completedStages} из ${stageCount} завершено</span>
+          <span class="badge badge--positive">${icon('check-verified.svg', 16)}${completedCount} из ${stageCount} ${goal.kind === 'study' ? 'семестров ' : ''}завершено</span>
         </div>
         <div class="saved-goal__actions">
           ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
@@ -2348,6 +2417,7 @@ let previouslyFocused = null
 let activeGoal = null
 let pageTransitioning = false
 let requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
+let requestedIndustryAction = new URLSearchParams(window.location.search).get('action')
 
 const screenRoutes = {
   goals: { template: invitationTemplate, focus: '#invitation-title' },
@@ -2374,7 +2444,13 @@ function getScreenFromLocation() {
 const appRootPath = APP_ROOT_URL.pathname
 
 function getScreenUrl(screen) {
-  if (screen === 'industry-goal') return `${appRootPath}study-goal/?view=industry`
+  if (screen === 'industry-goal') {
+    const url = new URL('study-goal/', APP_ROOT_URL)
+    url.searchParams.set('view', 'industry')
+    if (requestedStudyTab) url.searchParams.set('tab', requestedStudyTab)
+    if (requestedIndustryAction === 'add-application') url.searchParams.set('action', requestedIndustryAction)
+    return `${url.pathname}${url.search}`
+  }
   if (screen === 'vacancy' && selectedVacancyId) return `${appRootPath}study-goal/?view=vacancy&id=${encodeURIComponent(selectedVacancyId)}`
   if (screen === 'profile' && editingPortfolioProfileId) return `${appRootPath}profile/?id=${encodeURIComponent(editingPortfolioProfileId)}`
   if (['work-experience', 'job-expectations'].includes(screen) && isEditingOnboarding()) return `${appRootPath}${screen}/?edit=onboarding`
@@ -2401,6 +2477,12 @@ function initializeCurrentScreen() {
     requestedStudyTab = null
   }
   if (tablist) syncStudyTabIndicator(tablist, { animate: false })
+  if (requestedIndustryAction === 'add-application'
+    && getScreenFromLocation() === 'industry-goal'
+    && root.querySelector('[data-study-tab="applications"].is-active')) {
+    openApplicationDrawer()
+  }
+  requestedIndustryAction = null
 }
 
 function resolveJourneyScreen(screen) {
@@ -2586,10 +2668,24 @@ function renderCatalogPanel({ focusSelector } = {}) {
   if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
 }
 
-function renderVacanciesPanel({ focusSelector } = {}) {
+function renderVacanciesPanel({ focusSelector, preserveSearch = false } = {}) {
   const panel = root.querySelector('[data-study-panel="vacancies"]')
   if (!panel) return
-  panel.innerHTML = vacanciesTemplate()
+  const search = preserveSearch ? panel.querySelector('.vacancy-search') : null
+  if (search) {
+    const nextPanel = document.createElement('div')
+    nextPanel.innerHTML = vacanciesTemplate()
+    const main = panel.querySelector('.vacancies-main')
+    ;[...main.children].filter((child) => child !== search).forEach((child) => child.remove())
+    ;[...nextPanel.querySelector('.vacancies-main').children]
+      .filter((child) => !child.matches('.vacancy-search'))
+      .forEach((child) => main.append(child))
+    panel.querySelector('.vacancy-filters').replaceWith(nextPanel.querySelector('.vacancy-filters'))
+    const favoriteButton = search.querySelector('[data-vacancy-favorites-only]')
+    favoriteButton.classList.toggle('is-active', vacancyFavoritesOnly)
+    favoriteButton.setAttribute('aria-pressed', String(vacancyFavoritesOnly))
+    favoriteButton.setAttribute('aria-label', vacancyFavoritesOnly ? 'Показать все вакансии' : 'Показать только избранное')
+  } else panel.innerHTML = vacanciesTemplate()
   if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
 }
 
@@ -2656,13 +2752,21 @@ function plannerCourseActionAttributes(courseId, item, { semester, fromDrawer = 
   return `data-planner-course-action="${item.action}" data-course-id="${courseId}" data-semester="${semester}"${item.target !== undefined ? ` data-target-semester="${item.target}"` : ''}${fromDrawer ? ' data-course-action-drawer' : ''}${item.title ? ` title="${escapeHTML(item.title)}"` : ''}`
 }
 
-function courseDrawerActionsTemplate(courseId, semester) {
+function courseDrawerActionsTemplate(courseId, semester, { source = 'planner' } = {}) {
+  const placement = findPlannerItem(courseId)
+  const definitions = plannerCourseActionDefinitions(courseId, semester)
+  const semesterAction = definitions.find((item) => item.action === 'semesters')
+  const recommended = getRecommendedCourseSemester(courseId)
+  const actions = source === 'catalog' ? [
+    { action: 'recommended', label: 'В рекомендованный', asset: 'planner-plus.svg', iconSize: 18, disabled: recommended === null, title: recommended === null ? 'Курс уже в плане или нет доступного семестра' : `В рекомендованный ${recommended} семестр` },
+    { ...semesterAction, label: 'Добавить в семестр', disabled: Boolean(placement) || semesterAction.disabled },
+  ] : definitions.filter((item) => !item.separator && item.action !== 'about')
   return `<div class="course-drawer__actions">
-    ${plannerCourseActionDefinitions(courseId, semester).filter((item) => !item.separator && item.action !== 'about').map((item) => controlButton({
-      variant: item.destructive ? 'flat-destructive' : 'flat',
-      className: `course-drawer__action${item.action === 'semesters' ? ' course-drawer__action--semester' : ''}`,
-      content: `${icon(item.asset, item.iconSize || 20)}<span>${item.label}</span>`,
-      attributes: `${plannerCourseActionAttributes(courseId, item, { semester, fromDrawer: true })}${item.disabled ? ' disabled' : ''}${item.action === 'semesters' ? ' aria-haspopup="menu" aria-expanded="false" aria-controls="planner-course-semester-menu"' : ''}`,
+    ${actions.map((item) => controlButton({
+      variant: item.destructive ? 'flat-icon-destructive' : 'flat-icon',
+      className: 'course-drawer__action',
+      content: icon(item.asset, item.iconSize || 20),
+      attributes: `${plannerCourseActionAttributes(courseId, { ...item, title: item.title || item.label }, { semester, fromDrawer: true })} aria-label="${escapeHTML(item.label)}"${item.disabled ? ' disabled' : ''}${item.action === 'semesters' ? ' aria-haspopup="menu" aria-expanded="false" aria-controls="planner-course-semester-menu"' : ''}${item.action === 'completed' ? ` aria-pressed="${Boolean(placement?.item.completed)}"` : ''}`,
     })).join('')}
   </div>`
 }
@@ -2771,6 +2875,7 @@ function handlePlannerCourseAction(button) {
     return
   }
   const fromDrawer = button.hasAttribute('data-course-action-drawer')
+  const drawerSource = fromDrawer ? root.querySelector('.course-drawer')?.dataset.courseSource : undefined
   const semester = Number(button.dataset.semester)
   closePlannerCourseMenu({ restoreFocus: action === 'about' })
   if (action === 'about') return openPlannerCourseDrawer(courseId, { semester })
@@ -2785,7 +2890,7 @@ function handlePlannerCourseAction(button) {
   if (fromDrawer && action === 'remove') closeDialog(refresh)
   else {
     refresh()
-    if (fromDrawer) openPlannerCourseDrawer(courseId, { refresh: true, focusSelector: `[data-planner-course-action="${action === 'completed' ? 'completed' : 'semesters'}"]`, semester })
+    if (fromDrawer) openPlannerCourseDrawer(courseId, { refresh: true, focusSelector: `[data-planner-course-action="${action === 'completed' ? 'completed' : 'semesters'}"]`, semester, source: drawerSource })
   }
 }
 
@@ -2847,14 +2952,6 @@ function canMoveToPlannerSemester(semester) {
     && !isPlannerSemesterCompleted(semester)
 }
 
-function collapseAllPlannerIslands() {
-  const semesters = Array.from({ length: 8 }, (_, index) => index + 1)
-  plannerState.collapsedSemesters = [...semesters]
-  plannerState.collapsedCourseGroups = [...semesters]
-  plannerState.collapsedAvailableGroups = [...semesters]
-  savePlannerState()
-}
-
 function movePlannerCourse(courseId, targetSemester, targetIndex) {
   const source = findPlannerItem(courseId)
   const course = findPlannerCourse(courseId)
@@ -2895,7 +2992,7 @@ function openPlannerResetDialog(semester = null) {
   document.querySelector('.planner-dialog').focus()
 }
 
-function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, semester = null } = {}) {
+function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, semester = null, source = null } = {}) {
   const course = findPlannerCourse(courseId)
   const placement = findPlannerItem(courseId)
   if (!course) return
@@ -2917,12 +3014,13 @@ function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, sem
   const prerequisiteRows = relationRows(prerequisiteTitles)
   const corequisiteRows = relationRows(corequisiteTitles)
   const postrequisiteRows = postrequisiteTitles.map((title) => `<li class="course-drawer__relation"><img src="${ASSET}course-drawer-postrequisite.svg" width="20" height="20" alt="">${title}</li>`).join('')
+  const drawerSource = source || (refresh ? document.querySelector('.course-drawer')?.dataset.courseSource : null) || (placement ? 'planner' : 'catalog')
   const contextSemester = placement?.semester || semester || course.available.find((value) => canMoveToPlannerSemester(value)) || course.available[0] || CURRENT_SEMESTER
   const previousScroll = refresh ? document.querySelector('.course-drawer__scroll')?.scrollTop || 0 : 0
   if (!refresh) previouslyFocused = document.activeElement
   document.querySelector('#modal-root').innerHTML = `
     <div class="modal-backdrop modal-backdrop--sheet${refresh ? ' is-refresh' : ''}" role="presentation">
-      <aside class="course-drawer${refresh ? ' is-refresh' : ''}" data-course-id="${courseId}" role="dialog" aria-modal="true" aria-label="О курсе: ${course.title}" aria-describedby="course-drawer-description" tabindex="-1">
+      <aside class="course-drawer${refresh ? ' is-refresh' : ''}" data-course-id="${courseId}" data-course-source="${drawerSource}" role="dialog" aria-modal="true" aria-label="О курсе: ${course.title}" aria-describedby="course-drawer-description" tabindex="-1">
         ${controlButton({ className: 'goal-dialog__close course-drawer__close', content: icon('course-drawer-close.svg', 24), attributes: 'aria-label="Закрыть" data-close-dialog' })}
         <header class="course-drawer__header">
           <h2 id="course-drawer-title">О курсе</h2>
@@ -2968,7 +3066,7 @@ function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, sem
             </section>
           </div>
           <footer class="course-drawer__footer">
-            ${courseDrawerActionsTemplate(courseId, contextSemester)}
+            ${courseDrawerActionsTemplate(courseId, contextSemester, { source: drawerSource })}
           </footer>
         </div>
       </aside>
@@ -2976,7 +3074,8 @@ function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, sem
   setModalState(true)
   const drawer = document.querySelector('.course-drawer')
   drawer.querySelector('.course-drawer__scroll').scrollTop = previousScroll
-  ;(focusSelector ? drawer.querySelector(focusSelector) || drawer : drawer).focus({ preventScroll: true })
+  const focusTarget = focusSelector ? drawer.querySelector(focusSelector) : drawer
+  ;(focusTarget && !focusTarget.disabled ? focusTarget : drawer).focus({ preventScroll: true })
 }
 
 function openPlannerTrajectoryDialog() {
@@ -3131,6 +3230,7 @@ function restartScenario() {
   portfolioDraftFileObjects = { resume: null, portfolio: null }
   portfolioFileObjects.clear()
   vacancySearch = ''
+  vacancySalaryFrom = '0'
   vacancyFavoritesOnly = false
   vacancyFilters.clear()
   vacancyInternships = true
@@ -3152,6 +3252,7 @@ function restartScenario() {
   collapsedCatalogGroups.clear()
   openGlossaryTerms.clear()
   requestedStudyTab = null
+  requestedIndustryAction = null
   clearPlannerPointerDrag()
   setModalState(false)
   renderScreen('goals', { historyMode: 'replace' })
@@ -3162,6 +3263,15 @@ function closeSingleSelect(field) {
   field.querySelector('[data-ui-select-toggle]')?.setAttribute('aria-expanded', 'false')
   const menu = field.querySelector('.ui-select__options')
   if (menu) menu.hidden = true
+}
+
+function closeIndustryTaskTooltips(except = null) {
+  root.querySelectorAll('[data-industry-task-pending]').forEach((button) => {
+    if (button === except) return
+    button.removeAttribute('aria-describedby')
+    const tooltip = document.getElementById(button.getAttribute('aria-controls'))
+    if (tooltip) tooltip.hidden = true
+  })
 }
 
 function closeAllSingleSelects(except = null) {
@@ -3437,10 +3547,13 @@ root.addEventListener('click', (event) => {
     window.localStorage.setItem(GOAL_SELECTION_KEY, JSON.stringify(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]))
     root.querySelectorAll('.goal-card').forEach((item) => {
       const goal = goals.find((entry) => entry.id === item.dataset.goalId)
-      item.outerHTML = goalCard(goal)
+      const state = goalCardState(goal)
+      item.classList.toggle('goal-card--selected', state.selected)
+      item.setAttribute('aria-pressed', String(state.selected))
+      item.disabled = state.unavailable
     })
     root.querySelector('[data-confirm-goal-selection]').disabled = !getGoalSelection().length
-    root.querySelector(`[data-goal-id="${id}"]`)?.focus()
+    root.querySelector(`[data-goal-id="${id}"]`)?.focus({ preventScroll: true })
     return
   }
 
@@ -3496,6 +3609,19 @@ root.addEventListener('click', (event) => {
     vacancyDirectionOpen = false
     applicationFilterOpen = null
     activateStudyTab(studyTab)
+  }
+
+  const pendingIndustryTask = event.target.closest('[data-industry-task-pending]')
+  if (pendingIndustryTask) {
+    const tooltipId = pendingIndustryTask.getAttribute('aria-controls')
+    const tooltip = document.getElementById(tooltipId)
+    closeIndustryTaskTooltips(pendingIndustryTask)
+    if (tooltip) {
+      tooltip.hidden = !tooltip.hidden
+      if (tooltip.hidden) pendingIndustryTask.removeAttribute('aria-describedby')
+      else pendingIndustryTask.setAttribute('aria-describedby', tooltipId)
+    }
+    return
   }
 
   if (event.target.closest('[data-portfolio-add]')) {
@@ -3610,8 +3736,13 @@ root.addEventListener('click', (event) => {
     if (vacancyState.favorites.has(id)) vacancyState.favorites.delete(id)
     else vacancyState.favorites.add(id)
     saveVacancyState()
-    if (getScreenFromLocation() === 'vacancy') renderScreen('vacancy', { animate: false, historyMode: 'none' })
-    else renderVacanciesPanel({ focusSelector: `[data-vacancy-favorite="${id}"]` })
+    const favorite = vacancyState.favorites.has(id)
+    vacancyFavorite.classList.toggle('is-active', favorite)
+    vacancyFavorite.setAttribute('aria-pressed', String(favorite))
+    vacancyFavorite.setAttribute('aria-label', favorite ? 'Удалить из избранного' : 'Добавить в избранное')
+    if (vacancyFavoritesOnly && getScreenFromLocation() !== 'vacancy') {
+      renderVacanciesPanel({ focusSelector: '[data-vacancy-favorites-only]', preserveSearch: true })
+    }
   }
 
   const vacancyApply = event.target.closest('[data-vacancy-apply]')
@@ -3624,7 +3755,7 @@ root.addEventListener('click', (event) => {
   if (event.target.closest('[data-vacancy-favorites-only]')) {
     vacancyFavoritesOnly = !vacancyFavoritesOnly
     vacancyPage = 1
-    renderVacanciesPanel({ focusSelector: '[data-vacancy-favorites-only]' })
+    renderVacanciesPanel({ focusSelector: '[data-vacancy-favorites-only]', preserveSearch: true })
   }
 
   const vacancyFilter = event.target.closest('[data-vacancy-filter]')
@@ -3638,6 +3769,7 @@ root.addEventListener('click', (event) => {
 
   if (event.target.closest('[data-vacancy-reset]')) {
     vacancySearch = ''
+    vacancySalaryFrom = '0'
     vacancyFavoritesOnly = false
     vacancyFilters.clear()
     vacancyInternships = true
@@ -3659,10 +3791,10 @@ root.addEventListener('click', (event) => {
     event.preventDefault()
     return
   }
-  if (plannerCourseOpen) openPlannerCourseDrawer(plannerCourseOpen.dataset.plannerCourseOpen)
+  if (plannerCourseOpen) openPlannerCourseDrawer(plannerCourseOpen.dataset.plannerCourseOpen, { source: plannerCourseOpen.closest('[data-planner-picker-course]') ? 'catalog' : 'planner', semester: Number(plannerCourseOpen.closest('[data-planner-semester]')?.dataset.plannerSemester) || null })
 
   const catalogCourseOpen = event.target.closest('[data-catalog-course-open]')
-  if (catalogCourseOpen) openPlannerCourseDrawer(catalogCourseOpen.dataset.catalogCourseOpen)
+  if (catalogCourseOpen) openPlannerCourseDrawer(catalogCourseOpen.dataset.catalogCourseOpen, { source: 'catalog' })
 
   const catalogGroupToggle = event.target.closest('[data-catalog-group-toggle]')
   if (catalogGroupToggle) {
@@ -3877,6 +4009,7 @@ root.addEventListener('click', (event) => {
 })
 
 document.addEventListener('click', (event) => {
+  if (!event.target.closest('[data-industry-task-pending]')) closeIndustryTaskTooltips()
   if (!event.target.closest('#planner-course-menu, [data-planner-menu-toggle], [data-planner-course-action="semesters"], [data-planner-menu-back]')) closePlannerCourseMenu()
   if (!event.target.closest('[data-ui-multiselect^="planner-available-"], [data-planner-filter-toggle]')) closePlannerAvailableFilters()
   if (!event.target.closest('[data-ui-select]')) closeAllSingleSelects()
@@ -3895,6 +4028,10 @@ document.addEventListener('click', (event) => {
 })
 
 root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-vacancy-application-consent]')) {
+    event.target.closest('.vacancy-apply-consent')?.classList.remove('is-error')
+    event.target.setAttribute('aria-invalid', 'false')
+  }
   if (event.target.matches('[data-ui-select-checkbox]')) {
     const field = event.target.closest('[data-ui-select]')
     const select = field.querySelector('select')
@@ -3925,12 +4062,6 @@ root.addEventListener('change', (event) => {
   if (event.target.matches('[data-study-task]')) updateStudyProgress()
   if (event.target.matches('[data-industry-task]')) updateIndustryProgress()
 
-  if (event.target.matches('[data-vacancy-application-consent]')) {
-    const field = event.target.closest('.vacancy-apply-consent')
-    field?.classList.toggle('is-error', !event.target.checked)
-    event.target.setAttribute('aria-invalid', String(!event.target.checked))
-  }
-
   if (event.target.matches('[data-profile-file-kind]')) {
     const field = event.target.closest('[data-file-control]')
     const file = event.target.files?.[0]
@@ -3952,6 +4083,11 @@ root.addEventListener('change', (event) => {
     vacancyInternships = event.target.checked
     vacancyPage = 1
     renderVacanciesPanel({ focusSelector: '[data-vacancy-internships]' })
+  }
+  if (event.target.matches('[data-vacancy-salary]')) {
+    vacancySalaryFrom = event.target.value
+    vacancyPage = 1
+    renderVacanciesPanel({ focusSelector: '[data-ui-select-toggle="vacancy-salary"]' })
   }
   if (event.target.matches('[data-ui-multiselect-option="vacancy-role"]')) {
     if (event.target.checked) vacancySelectedDirections.add(event.target.value)
@@ -4108,7 +4244,6 @@ root.addEventListener('submit', (event) => {
       consent?.focus()
       return
     }
-
     const vacancyId = event.target.dataset.vacancyApplicationForm
     const vacancy = vacancies.find((item) => item.id === vacancyId)
     if (!vacancy) return
@@ -4260,7 +4395,16 @@ window.addEventListener('popstate', () => {
   selectedVacancyId = new URLSearchParams(window.location.search).get('id')
   editingPortfolioProfileId = new URLSearchParams(window.location.search).get('id')
   if (getScreenFromLocation() === 'industry-goal') requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
+  requestedIndustryAction = new URLSearchParams(window.location.search).get('action')
   renderScreen(getScreenFromLocation(), { historyMode: 'none' })
+})
+
+document.addEventListener('focusin', (event) => {
+  closeIndustryTaskTooltips(event.target.closest('[data-industry-task-pending]'))
+})
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeIndustryTaskTooltips()
 })
 
 document.addEventListener('keydown', (event) => {
@@ -4350,7 +4494,6 @@ root.addEventListener('pointermove', (event) => {
 
   if (!pointerPlannerDrag.active) {
     pointerPlannerDrag.active = true
-    collapseAllPlannerIslands()
     document.body.classList.add('is-planner-dragging')
     pointerPlannerDrag.card.setPointerCapture?.(event.pointerId)
     pointerPlannerDrag.card.classList.add('is-dragging')
@@ -4497,7 +4640,6 @@ root.addEventListener('keydown', (event) => {
     const course = findPlannerCourse(courseId)
     if (!course || !canMoveToPlannerSemester(semester) || getPlannedCourseIds().has(courseId)) return
     event.preventDefault()
-    collapseAllPlannerIslands()
     plannerState.semesters[semester].push({ id: courseId, completed: false, fixed: false })
     plannerState.collapsedSemesters = plannerState.collapsedSemesters.filter((value) => value !== semester)
     plannerState.collapsedCourseGroups = plannerState.collapsedCourseGroups.filter((value) => value !== semester)
@@ -4523,7 +4665,6 @@ root.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown') targetSemester = Array.from({ length: 8 - source.semester }, (_, index) => source.semester + index + 1).find(eligible) ?? source.semester
 
     if (targetSemester !== source.semester || (Number.isInteger(targetIndex) && targetIndex !== source.index)) {
-      collapseAllPlannerIslands()
       movePlannerCourse(course.id, targetSemester, targetIndex)
       renderPlannerDropResult(course.id, targetSemester)
     }
