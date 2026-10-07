@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=18'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=20'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -30,8 +30,6 @@ const GOAL_SELECTION_KEY = 'cpk:goal-selection-draft'
 const SHOW_GOAL_INFO_DIALOG = false
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
-const PLANNER_COURSE_TARGET = 24
-const PLANNER_CREDIT_TARGET = 60
 const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', '200 000–300 000', 'Более 300 000']
 const APPLICATION_STATUSES = ['Новый', 'На рассмотрении', 'Интервью', 'Тестовое', 'Тех. собес', 'Оффер', 'Отказ', 'В архиве']
 
@@ -454,6 +452,7 @@ function createDefaultPlannerState() {
   return {
     hideCompletedSemesters: false,
     hideProgress: false,
+    statisticsCollapsed: false,
     collapsedSemesters: [1, 2, 4, 5, 6, 7, 8],
     collapsedCourseGroups: [],
     collapsedAvailableGroups: [],
@@ -482,6 +481,7 @@ function getPlannerState() {
     return {
       hideCompletedSemesters: Boolean(saved.hideCompletedSemesters),
       hideProgress: Boolean(saved.hideProgress),
+      statisticsCollapsed: Boolean(saved.statisticsCollapsed),
       collapsedSemesters: Array.isArray(saved.collapsedSemesters)
         ? saved.collapsedSemesters.filter((semester) => Number.isInteger(semester) && semester >= 1 && semester <= 8)
         : [],
@@ -518,6 +518,10 @@ let catalogWorkloads = new Set()
 let catalogRequisites = new Set()
 let catalogStatuses = new Set()
 let catalogFilterOpen = null
+let plannerAvailableFilters = new Map()
+let plannerAvailableLimits = new Map()
+let plannerAvailableFilterOpen = null
+let plannerCourseMenu = null
 let collapsedCatalogGroups = new Set()
 let openGlossaryTerms = new Set()
 let vacancySearch = ''
@@ -754,7 +758,7 @@ const opportunities = [
 ]
 
 const icon = (name, size = 18, className = 'icon') =>
-  `<img aria-hidden="true" class="${className}" src="${ASSET}${name}" width="${size}" height="${size}" alt="">`
+  `<img aria-hidden="true" draggable="false" class="${className}" src="${ASSET}${name}" width="${size}" height="${size}" alt="">`
 
 const escapeHTML = (value = '') => String(value)
   .replaceAll('&', '&amp;')
@@ -862,7 +866,10 @@ function headerIsland() {
           <p>Личная карьерная цель помогает выбрать курсы, активности, проекты и вакансии.</p>
           <p>Если сложно сформулировать ее самостоятельно — начни с консультации.</p>
         </div>
-        ${controlButton({ className: 'flat-button flat-button--primary header-island__action', content: `${icon('message-chat-square.svg', 20)}<span>Хочу консультацию</span>` })}
+        <div class="header-island__actions">
+          ${controlButton({ className: 'flat-button flat-button--primary header-island__consultation-action', content: `${icon('message-chat-square.svg', 20)}<span>Хочу консультацию</span>` })}
+          ${getOnboarding().completed ? controlButton({ variant: 'flat', content: 'Редактировать данные', attributes: 'data-edit-onboarding' }) : ''}
+        </div>
       </div>
       <div class="header-island__art header-island__art--goals" aria-hidden="true">${icon('goals-header-illustration.svg', 389, 'header-island__art-image')}</div>
     </section>`
@@ -940,7 +947,6 @@ function invitationTemplate() {
               <p>${getOnboarding().completed ? 'Выбери до двух целей, чтобы спланировать учебу и карьерные шаги. Данные о работе и ожиданиях сохранены — их можно изменить позже.' : 'Расскажи о своей работе и ожиданиях, а затем выбери до двух целей. Они помогут спланировать учебу и карьерные шаги. Данные и цели можно изменить позже.'}</p>
             </div>
             ${controlButton({ className: 'flat-button flat-button--primary', content: 'Выбрать цель', attributes: 'data-start-onboarding' })}
-            ${getOnboarding().completed ? controlButton({ className: 'flat-button flat-button--outline', content: 'Редактировать данные', attributes: 'data-edit-onboarding' }) : ''}
           </section>
           ${infoPanel()}
         </div>
@@ -957,7 +963,6 @@ function appTemplate() {
       ${informerFooter()}
       <main class="page-content work-step">
         ${journeyHeader({ backAttributes: 'data-selection-back' })}
-        ${privacyNote()}
         <div class="work-step__layout">
           <section class="work-form work-form--goals" aria-labelledby="goals-heading">
             <div class="work-form__heading">
@@ -1060,8 +1065,6 @@ function jobExpectationsTemplate() {
       <main class="page-content work-step">
         ${journeyHeader()}
 
-        ${privacyNote()}
-
         <div class="work-step__layout">
           <form class="work-form work-form--expectations" data-onboarding-step="expectations" novalidate>
             <div class="work-form__heading">
@@ -1071,7 +1074,7 @@ function jobExpectationsTemplate() {
             <div class="work-form__fields">
               ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не знаю</span>' })}
               ${fieldControl({ id: 'desired-company', label: 'В каких компаниях хочешь работать*', placeholder: 'Названия компаний', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи хотя бы одну компанию' })}
-              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: values.desiredSpecialty || [], multiple: true, inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери хотя бы одну специальность' })}
+              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: values.desiredSpecialty || [], multiple: true, checkContent: icon('check-small.svg', 16), inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери хотя бы одну специальность' })}
               ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.desiredGrade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
               ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.desiredSalary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
@@ -1200,6 +1203,67 @@ function studyTabPlaceholder(id, title, description) {
     </section>`
 }
 
+function createCourseFilters() {
+  return Object.fromEntries(['direction', 'category', 'semester', 'workload', 'requisites', 'status'].map((id) => [id, new Set()]))
+}
+
+function catalogFilterSets() {
+  return { direction: catalogDirections, category: catalogCategories, semester: catalogSemesters, workload: catalogWorkloads, requisites: catalogRequisites, status: catalogStatuses }
+}
+
+function getAvailableCourseFilters(semester) {
+  if (!plannerAvailableFilters.has(semester)) plannerAvailableFilters.set(semester, createCourseFilters())
+  return plannerAvailableFilters.get(semester)
+}
+
+function courseMatchesFilters(course, filters) {
+  const placement = findPlannerItem(course.id)
+  const status = placement?.item.completed ? 'completed' : placement ? 'planned' : 'available'
+  return (!filters.direction.size || course.specializations.some((value) => filters.direction.has(value)))
+    && (!filters.category.size || filters.category.has(course.category))
+    && (!filters.semester.size || course.available.some((value) => filters.semester.has(value)))
+    && (!filters.workload.size || filters.workload.has(course.workload))
+    && (!filters.requisites.size || filters.requisites.has(course.prerequisiteNames.length + course.corequisiteNames.length ? 'with' : 'without'))
+    && (!filters.status.size || filters.status.has(status))
+}
+
+function courseFilterDefinitions() {
+  return [
+    ['direction', 'Направление', [...new Set(plannerCourses.flatMap((course) => course.specializations))].sort((a, b) => a.localeCompare(b, 'ru')).map((value) => ({ value, label: value }))],
+    ['category', 'Тип курса', courseCategories.map((value) => ({ value, label: value }))],
+    ['semester', 'Семестр', availableCatalogSemesters.map((value) => ({ value: String(value), label: String(value) }))],
+    ['workload', 'Нагрузка', courseWorkloads.map((value) => ({ value: String(value), label: `${value} ${pluralizePairs(value)}` }))],
+    ['requisites', 'Реквизиты', [{ value: 'with', label: 'Есть реквизиты' }, { value: 'without', label: 'Без реквизитов' }]],
+    ['status', 'Статус', [{ value: 'planned', label: 'В плане' }, { value: 'available', label: 'Не в плане' }, { value: 'completed', label: 'Пройдено' }]],
+  ]
+}
+
+function courseFilterControls({ prefix, filters, openFilter, semester = null }) {
+  return courseFilterDefinitions().map(([id, label, options]) => multiSelectControl({
+    id: `${prefix}-${id}`,
+    label: semester !== null && id === 'semester' ? 'Доступные семестры' : label,
+    placeholder: semester !== null && id === 'semester' ? 'Доступные семестры' : label,
+    options,
+    selected: new Set([...filters[id]].map(String)),
+    open: openFilter === id,
+    checkContent: icon('check-small.svg', 20),
+    attributes: semester === null ? `data-catalog-filter-toggle="${id}"` : `data-planner-filter-toggle="${semester}" data-filter-name="${id}"`,
+  })).join('')
+}
+
+function completedCourseBadge() {
+  return '<span class="badge badge--positive planner-course__completed-badge">Пройдено</span>'
+}
+
+function courseCardToolbar(course, semester) {
+  return controlButton({
+      variant: 'context-trigger',
+      className: 'planner-course__menu-toggle',
+      content: icon('planner-menu-dots.svg', 18),
+      attributes: `data-planner-menu-toggle="${course.id}" data-semester="${semester}" aria-label="Действия с курсом «${escapeHTML(course.title)}»" aria-haspopup="menu" aria-expanded="false" aria-controls="planner-course-context-menu"`,
+    })
+}
+
 function courseCardContent(course, { completed = false, conflict = false } = {}) {
   const postrequisiteCount = plannerCourses.filter((candidate) => candidate.prerequisites.includes(course.id)).length
   const requisiteCount = course.prerequisiteNames.length + course.corequisiteNames.length + postrequisiteCount
@@ -1207,9 +1271,9 @@ function courseCardContent(course, { completed = false, conflict = false } = {})
   return `<span class="planner-course__content">
     <span class="planner-course__heading-line">
       <span class="planner-course__title">${course.title}</span>
-      ${completed ? `<img class="planner-course__completed-icon" src="${ASSET}check-verified.svg" width="16" height="16" alt="Пройден">` : ''}
     </span>
     <span class="planner-course__tags">
+      ${completed ? completedCourseBadge() : ''}
       <span class="planner-course__tag">${course.workload} ${pluralizePairs(course.workload)} в неделю</span>
       <span class="planner-course__tag">Семестры: ${course.available.join(', ')}</span>
       ${requisiteCount ? `<span class="planner-course__tag">Реквизиты: ${requisiteCount}</span>` : ''}
@@ -1234,31 +1298,12 @@ function catalogCourseCard(course) {
 
 function catalogTemplate() {
   const query = catalogSearch.trim().toLowerCase()
+  const filters = catalogFilterSets()
   const filtered = plannerCourses.filter((course) =>
     (!query || course.title.toLowerCase().includes(query) || course.description.toLowerCase().includes(query))
-    && (!catalogDirections.size || course.specializations.some((direction) => catalogDirections.has(direction)))
-    && (!catalogSemesters.size || course.available.some((semester) => catalogSemesters.has(semester)))
-    && (!catalogCategories.size || catalogCategories.has(course.category))
-    && (!catalogWorkloads.size || catalogWorkloads.has(course.workload))
-    && (!catalogRequisites.size || catalogRequisites.has(course.prerequisiteNames.length + course.corequisiteNames.length ? 'with' : 'without'))
-    && (!catalogStatuses.size || (() => {
-      const placement = findPlannerItem(course.id)
-      const status = placement?.item.completed ? 'completed' : placement ? 'planned' : 'available'
-      return catalogStatuses.has(status)
-    })()),
+    && courseMatchesFilters(course, filters),
   )
   const groups = [...new Set(filtered.map((course) => course.category))]
-  const directionOptions = [...new Set(plannerCourses.flatMap((course) => course.specializations))].sort((a, b) => a.localeCompare(b, 'ru')).map((value) => ({ value, label: value }))
-  const filterControl = (id, label, options, selected) => multiSelectControl({
-    id: `catalog-${id}`,
-    label,
-    placeholder: label,
-    options,
-    selected,
-    open: catalogFilterOpen === id,
-    checkContent: icon('check-small.svg', 20),
-    attributes: `data-catalog-filter-toggle="${id}"`,
-  })
 
   return `
     <section class="catalog" aria-labelledby="catalog-title">
@@ -1266,12 +1311,7 @@ function catalogTemplate() {
       <div class="catalog-filters">
         ${fieldControl({ id: 'catalog-search', label: 'Поиск по курсам', hideLabel: true, placeholder: 'Поиск', required: false, value: catalogSearch, className: 'input-search', leadingContent: icon('search.svg', 20), inputAttributes: 'data-catalog-search autocomplete="off"' })}
         <div class="catalog-filter-bar">
-          ${filterControl('direction', 'Направление', directionOptions, catalogDirections)}
-          ${filterControl('category', 'Тип курса', courseCategories.map((value) => ({ value, label: value })), catalogCategories)}
-          ${filterControl('semester', 'Семестр', availableCatalogSemesters.map((value) => ({ value: String(value), label: String(value) })), new Set([...catalogSemesters].map(String)))}
-          ${filterControl('workload', 'Нагрузка', courseWorkloads.map((value) => ({ value: String(value), label: `${value} ${pluralizePairs(value)}` })), new Set([...catalogWorkloads].map(String)))}
-          ${filterControl('requisites', 'Реквизиты', [{ value: 'with', label: 'Есть реквизиты' }, { value: 'without', label: 'Без реквизитов' }], catalogRequisites)}
-          ${filterControl('status', 'Статус', [{ value: 'planned', label: 'В плане' }, { value: 'available', label: 'Не в плане' }, { value: 'completed', label: 'Завершен' }], catalogStatuses)}
+          ${courseFilterControls({ prefix: 'catalog', filters, openFilter: catalogFilterOpen })}
           ${catalogSearch || catalogDirections.size || catalogSemesters.size || catalogCategories.size || catalogWorkloads.size || catalogRequisites.size || catalogStatuses.size
             ? controlButton({ variant: 'flat', className: 'catalog__reset', content: 'Сбросить', attributes: 'data-catalog-reset' })
             : ''}
@@ -1339,49 +1379,49 @@ function plannerCourseTemplate(item, semester, index) {
 
   return `
     <article class="education-card planner-course course-card--detailed ${item.completed ? 'planner-course--completed' : ''} ${conflict ? 'planner-course--conflict' : ''}" ${semesterCompleted ? '' : 'data-planner-drag-handle'} data-planner-course="${course.id}" data-planner-semester="${semester}" data-planner-index="${index}">
+      ${courseCardToolbar(course, semester)}
       ${controlButton({
         className: 'planner-course__open',
         attributes: `aria-label="Подробнее о курсе «${course.title}»" aria-describedby="planner-drag-instructions" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight" data-planner-course-open="${course.id}"`,
         content: courseCardContent(course, { completed: item.completed, conflict }),
       })}
-      <div class="planner-course__footer">
-        ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-course__about', content: 'О курсе', attributes: `data-planner-course-open="${course.id}" aria-label="Подробнее о курсе «${course.title}»"` })}
-        <div class="planner-course__actions">
-          ${semesterCompleted
-            ? '<span class="planner-course__fixed">Завершен</span>'
-            : !item.fixed
-              ? controlButton({ variant: 'flat-destructive', className: 'planner-course__remove', content: `${icon('trash.svg', 18)}<span>Удалить</span>`, attributes: `data-planner-remove data-course-id="${course.id}" data-semester="${semester}"` })
-              : '<span class="planner-course__fixed">Обязательный</span>'}
-        </div>
-      </div>
+      ${item.fixed ? '<div class="planner-course__footer planner-course__footer--meta"><span class="planner-course__fixed">Обязательный курс</span></div>' : ''}
     </article>`
 }
 
 function plannerAvailableCoursesTemplate(semester) {
   const plannedIds = getPlannedCourseIds()
-  const available = plannerCourses.filter((course) =>
-    course.available.includes(semester)
-    && !plannedIds.has(course.id)
-  ).slice(0, 8)
+  const filters = getAvailableCourseFilters(semester)
+  const matching = plannerCourses.filter((course) => course.available.includes(semester) && !plannedIds.has(course.id) && courseMatchesFilters(course, filters))
+  const limit = plannerAvailableLimits.get(semester) || 8
+  const available = matching.slice(0, limit)
+  const hasFilters = Object.values(filters).some((set) => set.size)
+  const openFilter = plannerAvailableFilterOpen?.semester === semester ? plannerAvailableFilterOpen.filter : null
 
-  return `
-    <div class="planner-course-grid planner-available-grid">
-        ${available.length ? available.map((course) => `
-          <article class="education-card planner-course course-card--detailed planner-picker-course" data-planner-drag-handle data-planner-picker-course="${course.id}" data-planner-semester="${semester}">
-            ${controlButton({
-              className: 'planner-course__open planner-picker-course__content',
-              attributes: `aria-label="Подробнее о курсе «${course.title}»" aria-describedby="planner-drag-instructions" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight" data-planner-course-open="${course.id}"`,
-              content: courseCardContent(course),
-            })}
-            <div class="planner-course__footer planner-picker-course__footer">
-              ${controlButton({ className: 'flat-button flat-button--neutral flat-button--text planner-course__about', content: 'О курсе', attributes: `data-planner-course-open="${course.id}" aria-label="Подробнее о курсе «${course.title}»"` })}
-            </div>
-          </article>`).join('') : `
-          <div class="planner-picker__empty">
-            <strong>Все доступные курсы уже добавлены</strong>
-            <span>Перетащи сюда курс из другого семестра или открой каталог</span>
-          </div>`}
-    </div>`
+  return `<div class="planner-available-courses">
+    <div class="catalog-filter-bar planner-available-filters" aria-label="Фильтры доступных курсов ${semester}-го семестра">
+      ${courseFilterControls({ prefix: `planner-available-${semester}`, filters, openFilter, semester })}
+      ${hasFilters ? controlButton({ variant: 'flat', className: 'catalog__reset', content: 'Сбросить', attributes: `data-planner-filter-reset="${semester}"` }) : ''}
+    </div>
+    <div class="planner-course-grid planner-available-grid" aria-live="polite">
+      ${available.length ? available.map((course) => `
+        <article class="education-card planner-course course-card--detailed planner-picker-course" data-planner-drag-handle data-planner-picker-course="${course.id}" data-planner-semester="${semester}">
+          ${courseCardToolbar(course, semester)}
+          ${controlButton({
+            className: 'planner-course__open planner-picker-course__content',
+            attributes: `aria-label="Подробнее о курсе «${course.title}»" aria-describedby="planner-drag-instructions" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight" data-planner-course-open="${course.id}"`,
+            content: courseCardContent(course),
+          })}
+          <div class="planner-course__footer planner-picker-course__footer">
+            ${controlButton({ variant: 'flat', className: 'planner-course__add', content: 'Добавить', attributes: `data-planner-course-action="add" data-course-id="${course.id}" data-target-semester="${semester}" aria-label="Добавить курс «${escapeHTML(course.title)}» в ${semester}-й семестр"` })}
+          </div>
+        </article>`).join('') : `<div class="planner-picker__empty">
+        <strong>${hasFilters ? 'Подходящих курсов нет' : 'Все доступные курсы уже добавлены'}</strong>
+        <span>${hasFilters ? 'Измени фильтры или сбрось их' : 'Перетащи сюда курс из другого семестра или открой каталог'}</span>
+      </div>`}
+    </div>
+    ${matching.length > limit ? controlButton({ variant: 'flat', content: `Показать еще ${Math.min(8, matching.length - limit)}`, attributes: `data-planner-available-more="${semester}"` }) : ''}
+  </div>`
 }
 
 function plannerCourseGroupTemplate({ semester, type, title, items = [], completed = false }) {
@@ -1461,37 +1501,37 @@ function plannerSemesterTemplate(semester) {
 }
 
 function plannerTemplate() {
-  const summary = plannerSummary()
-  const conflicts = getPlannerConflicts().length
-  const usedCredits = Object.values(plannerState.semesters).flat().reduce((sum, item) => sum + Math.max(2, Math.round((findPlannerCourse(item.id)?.workload || 0) * 1.5)), 0)
-
+  const statisticsExpanded = !plannerState.statisticsCollapsed
   return `
     <section class="planner" aria-labelledby="planner-title">
       <h2 class="visually-hidden" id="planner-title">Планировщик</h2>
       <p class="visually-hidden" id="planner-drag-instructions">Перетащи курс за основную область карточки в другой семестр. Для доступного курса перетаскивание добавит его в семестр. С клавиатуры используй Alt и клавиши со стрелками.</p>
-      <section class="planner-statistics" aria-labelledby="planner-statistics-title">
-        <header class="planner-statistics__header"><h3 id="planner-statistics-title">Статистика</h3>${icon('chevron-up.svg', 18)}</header>
-        <div class="planner-overview" aria-label="Сводка учебного плана">
-          <div class="planner-metric"><span>Курсов выбрано</span><strong>${summary.planned}<small> / ${PLANNER_COURSE_TARGET}</small></strong></div>
-          <div class="planner-metric"><span>Конфликты</span><strong>${conflicts}</strong></div>
-          <div class="planner-metric"><span>Свободные кредиты</span><strong>${Math.max(0, PLANNER_CREDIT_TARGET - usedCredits)}</strong></div>
+      <section class="planner-statistics ${statisticsExpanded ? 'planner-statistics--expanded' : ''}" aria-labelledby="planner-statistics-title">
+        <header class="planner-statistics__header"><h3 id="planner-statistics-title">${controlButton({ className: 'planner-statistics__toggle', content: `<span>Статистика</span>${icon('chevron-down.svg', 18)}`, attributes: `data-planner-statistics-toggle aria-expanded="${statisticsExpanded}" aria-controls="planner-statistics-panel"` })}</h3></header>
+        <div class="planner-statistics__panel" id="planner-statistics-panel" aria-hidden="${!statisticsExpanded}" ${statisticsExpanded ? '' : 'inert'}>
+          <div class="planner-statistics__panel-inner">
+            <div class="planner-overview" aria-label="Сводка учебного плана">
           ${[
             ['Business', 25, 16], ['Software Engineering', 16, 32], ['AI', 52, 18],
           ].map(([label, earned, available]) => `<div class="planner-track"><strong>${label}</strong><div class="planner-track__bar"><span style="width:${earned}%"></span><i style="width:${available}%"></i></div><dl><div><dt>Набрано</dt><dd>${earned}%</dd></div><div><dt>Можно набрать</dt><dd>${available}%</dd></div></dl></div>`).join('')}
+            </div>
+          </div>
         </div>
       </section>
-      <div class="planner-semesters-heading">
-        <div class="planner-semesters-heading__title">
-          <h3>Семестры</h3>
-          <span class="badge badge--positive">${icon('check-verified.svg', 16)}2 из 3 семестров завершено</span>
+      <div class="planner-semesters-group">
+        <div class="planner-semesters-heading">
+          <div class="planner-semesters-heading__title">
+            <h3>Семестры</h3>
+            <span class="badge badge--positive">${icon('check-verified.svg', 16)}2 из 3 семестров завершено</span>
+          </div>
+          <div class="planner__primary-actions">
+            ${controlButton({ className: 'flat-button flat-button--outline planner-trajectory-button', content: `${icon('stars.svg', 20)}<span>Подобрать траекторию</span>`, attributes: 'data-planner-trajectory' })}
+            ${controlButton({ variant: 'flat-destructive', className: 'planner-reset-all', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
+          </div>
         </div>
-        <div class="planner__primary-actions">
-          ${controlButton({ className: 'flat-button flat-button--outline planner-trajectory-button', content: `${icon('stars.svg', 20)}<span>Подобрать траекторию</span>`, attributes: 'data-planner-trajectory' })}
-          ${controlButton({ variant: 'flat-destructive', className: 'planner-reset-all', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
+        <div class="planner-semesters">
+          ${Array.from({ length: 8 }, (_, index) => plannerSemesterTemplate(index + 1)).join('')}
         </div>
-      </div>
-      <div class="planner-semesters">
-        ${Array.from({ length: 8 }, (_, index) => plannerSemesterTemplate(index + 1)).join('')}
       </div>
     </section>`
 }
@@ -2380,6 +2420,8 @@ function resolveJourneyScreen(screen) {
 function renderScreen(screen, { animate = true, historyMode = 'push' } = {}) {
   if (animate && pageTransitioning) return
 
+  closePlannerCourseMenu()
+  closePlannerAvailableFilters()
   const resolvedScreen = resolveJourneyScreen(screen)
   const route = screenRoutes[resolvedScreen]
   if (historyMode === 'none' && resolvedScreen !== screen) historyMode = 'replace'
@@ -2518,6 +2560,7 @@ function openGoalLimitDialog() {
 }
 
 function renderPlannerPanel({ focusSelector } = {}) {
+  closePlannerCourseMenu()
   const panel = root.querySelector('[data-study-panel="planner"]')
   if (!panel) return
   panel.innerHTML = plannerTemplate()
@@ -2548,6 +2591,239 @@ function renderVacanciesPanel({ focusSelector } = {}) {
   if (!panel) return
   panel.innerHTML = vacanciesTemplate()
   if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
+}
+
+function canPlacePlannerCourse(courseId, semester) {
+  const course = findPlannerCourse(courseId)
+  const source = findPlannerItem(courseId)
+  return Boolean(course && course.available.includes(semester) && canMoveToPlannerSemester(semester)
+    && (!source || (source.semester !== semester && !isPlannerSemesterCompleted(source.semester))))
+}
+
+function getRecommendedCourseSemester(courseId) {
+  const course = findPlannerCourse(courseId)
+  if (!course || findPlannerItem(courseId)) return null
+  const available = course.available.filter((semester) => canPlacePlannerCourse(courseId, semester)).sort((a, b) => a - b)
+  const withoutConflicts = available.filter((semester) => !courseHasConflict(courseId, semester))
+  const preferred = withoutConflicts.length ? withoutConflicts : available
+  return preferred.find((semester) => getSemesterLoad(semester) + course.workload <= 16)
+    ?? preferred.reduce((best, semester) => best === null || getSemesterLoad(semester) < getSemesterLoad(best) ? semester : best, null)
+}
+
+function applyPlannerCourseAction(courseId, action, targetSemester) {
+  const course = findPlannerCourse(courseId)
+  const placement = findPlannerItem(courseId)
+  if (!course) return false
+  if (action === 'recommended') {
+    const recommended = getRecommendedCourseSemester(courseId)
+    return recommended !== null && applyPlannerCourseAction(courseId, 'add', recommended)
+  }
+  if (action === 'place' || action === 'add') {
+    if (!canPlacePlannerCourse(courseId, targetSemester) || (action === 'add' && placement)) return false
+    if (placement) return movePlannerCourse(courseId, targetSemester)
+    plannerState.semesters[targetSemester].push({ id: courseId, completed: false, fixed: false })
+    plannerState.collapsedSemesters = plannerState.collapsedSemesters.filter((value) => value !== targetSemester)
+    plannerState.collapsedCourseGroups = plannerState.collapsedCourseGroups.filter((value) => value !== targetSemester)
+  } else if (action === 'completed') {
+    if (!placement || placement.semester < CURRENT_SEMESTER) return false
+    placement.item.completed = !placement.item.completed
+  } else if (action === 'remove') {
+    if (!placement || placement.item.fixed || isPlannerSemesterCompleted(placement.semester)) return false
+    plannerState.semesters[placement.semester].splice(placement.index, 1)
+  } else return false
+  savePlannerState()
+  return true
+}
+
+function plannerCourseActionDefinitions(courseId, semester) {
+  const placement = findPlannerItem(courseId)
+  const recommended = getRecommendedCourseSemester(courseId)
+  const current = placement?.semester || semester
+  const movable = Array.from({ length: 8 }, (_, index) => index + 1).some((target) => canPlacePlannerCourse(courseId, target))
+  return [
+    ...(!placement ? [{ action: 'recommended', label: 'Добавить в рекомендованный', asset: 'planner-plus.svg', iconSize: 18, disabled: recommended === null, title: recommended === null ? 'Сейчас нет доступного семестра' : `Рекомендуемый: ${recommended} семестр` }] : []),
+    { action: 'place', target: current - 1, label: 'В предыдущий семестр', asset: 'planner-menu-up.svg', disabled: !canPlacePlannerCourse(courseId, current - 1) },
+    { action: 'place', target: current + 1, label: 'В следующий семестр', asset: 'planner-menu-down.svg', disabled: !canPlacePlannerCourse(courseId, current + 1) },
+    { action: 'semesters', label: placement ? 'Перенести в семестр' : 'Добавить в семестр', asset: 'planner-menu-move.svg', disabled: !movable },
+    { action: 'completed', label: placement?.item.completed ? 'Отметить непройденным' : 'Отметить пройденным', asset: 'planner-menu-check.svg', disabled: !placement || placement.semester < CURRENT_SEMESTER },
+    { action: 'about', label: 'О курсе', asset: 'planner-menu-info.svg' },
+    { separator: true },
+    { action: 'remove', label: 'Удалить', asset: 'planner-menu-trash.svg', destructive: true, disabled: !placement || placement.item.fixed || isPlannerSemesterCompleted(placement.semester) },
+  ]
+}
+
+function plannerCourseActionAttributes(courseId, item, { semester, fromDrawer = false } = {}) {
+  return `data-planner-course-action="${item.action}" data-course-id="${courseId}" data-semester="${semester}"${item.target !== undefined ? ` data-target-semester="${item.target}"` : ''}${fromDrawer ? ' data-course-action-drawer' : ''}${item.title ? ` title="${escapeHTML(item.title)}"` : ''}`
+}
+
+function courseDrawerActionsTemplate(courseId, semester) {
+  return `<div class="course-drawer__actions">
+    ${plannerCourseActionDefinitions(courseId, semester).filter((item) => !item.separator && item.action !== 'about').map((item) => controlButton({
+      variant: item.destructive ? 'flat-destructive' : 'flat',
+      className: `course-drawer__action${item.action === 'semesters' ? ' course-drawer__action--semester' : ''}`,
+      content: `${icon(item.asset, item.iconSize || 20)}<span>${item.label}</span>`,
+      attributes: `${plannerCourseActionAttributes(courseId, item, { semester, fromDrawer: true })}${item.disabled ? ' disabled' : ''}${item.action === 'semesters' ? ' aria-haspopup="menu" aria-expanded="false" aria-controls="planner-course-semester-menu"' : ''}`,
+    })).join('')}
+  </div>`
+}
+
+function closePlannerCourseMenu({ restoreFocus = false } = {}) {
+  const anchor = plannerCourseMenu?.anchor
+  anchor?.setAttribute('aria-expanded', 'false')
+  root.querySelector('#planner-course-menu')?.remove()
+  plannerCourseMenu = null
+  if (restoreFocus && anchor?.isConnected) anchor.focus({ preventScroll: true })
+}
+
+function focusPlannerMenuItem(menu, last = false) {
+  if (!menu) return
+  const items = [...menu.querySelectorAll('[role="menuitem"]:not(:disabled)')]
+  ;(last ? items.at(-1) : items[0])?.focus({ preventScroll: true })
+}
+
+function renderPlannerCourseMenu({ focus = false } = {}) {
+  if (!plannerCourseMenu?.anchor.isConnected) return closePlannerCourseMenu()
+  const { courseId, semester, anchor, fromDrawer, submenu, onlySemesters } = plannerCourseMenu
+  const planned = Boolean(findPlannerItem(courseId))
+  const items = plannerCourseActionDefinitions(courseId, semester).filter((item) => planned || item.action === 'semesters').map((item) => item.separator ? item : ({
+    ...item,
+    label: planned ? item.label : 'Добавить в семестр',
+    iconContent: icon(item.asset, item.iconSize || 20),
+    trailingContent: item.action === 'semesters' ? icon('planner-menu-chevron.svg', 24) : '',
+    attributes: `${plannerCourseActionAttributes(courseId, item, { semester, fromDrawer })}${item.action === 'semesters' ? ` aria-haspopup="menu" aria-expanded="${submenu}" aria-controls="planner-course-semester-menu"` : ''}`,
+  }))
+  const compact = window.innerWidth < 640
+  const semesterItems = Array.from({ length: 8 }, (_, index) => index + 1).map((target) => ({
+    label: `${target} семестр`,
+    disabled: !canPlacePlannerCourse(courseId, target),
+    attributes: plannerCourseActionAttributes(courseId, { action: 'place', target }, { semester, fromDrawer }),
+  }))
+  if (compact && !onlySemesters) semesterItems.unshift({ label: 'Назад', attributes: 'data-planner-menu-back' })
+  let portal = root.querySelector('#planner-course-menu')
+  if (!portal) {
+    portal = document.createElement('div')
+    portal.id = 'planner-course-menu'
+    root.append(portal)
+  }
+  portal.innerHTML = `${!onlySemesters ? contextMenuControl({ id: 'planner-course-context-menu', label: 'Действия с курсом', items }) : ''}
+    ${submenu || onlySemesters ? contextMenuControl({ id: 'planner-course-semester-menu', label: 'Выбери семестр', items: semesterItems }) : ''}`
+  const main = portal.querySelector('#planner-course-context-menu')
+  const sub = portal.querySelector('#planner-course-semester-menu')
+  const rect = anchor.getBoundingClientRect()
+  const menu = main || sub
+  menu.style.width = `${Math.min(onlySemesters ? 200 : 300, window.innerWidth - 24)}px`
+  const width = menu.getBoundingClientRect().width
+  const height = menu.getBoundingClientRect().height
+  const fitsBeside = rect.right + width + 16 <= window.innerWidth && !fromDrawer
+  const left = Math.max(12, Math.min(fitsBeside ? rect.right + 4 : rect.left, window.innerWidth - width - 12))
+  const desiredTop = fitsBeside ? rect.top : rect.bottom + 4
+  const top = Math.max(12, Math.min(desiredTop, window.innerHeight - height - 12))
+  menu.style.left = `${left}px`
+  menu.style.top = `${top}px`
+  if (sub && main) {
+    sub.style.width = `${Math.min(compact ? 300 : 200, window.innerWidth - 24)}px`
+    const submenuWidth = sub.getBoundingClientRect().width
+    const submenuHeight = sub.getBoundingClientRect().height
+    const parentItem = main.querySelector('[data-planner-course-action="semesters"]')
+    let mainRect = main.getBoundingClientRect()
+    if (!compact && mainRect.right + submenuWidth + 14 > window.innerWidth && mainRect.left - submenuWidth - 2 < 12) {
+      main.style.left = `${Math.max(12, window.innerWidth - mainRect.width - submenuWidth - 14)}px`
+      mainRect = main.getBoundingClientRect()
+    }
+    const itemRect = parentItem.getBoundingClientRect()
+    const submenuLeft = mainRect.right + submenuWidth + 14 <= window.innerWidth
+      ? mainRect.right + 2 : Math.max(12, mainRect.left - submenuWidth - 2)
+    sub.style.left = `${compact ? left : submenuLeft}px`
+    sub.style.top = `${Math.max(12, Math.min(compact ? top : itemRect.top, window.innerHeight - submenuHeight - 12))}px`
+    if (compact) main.hidden = true
+  }
+  anchor.setAttribute('aria-expanded', 'true')
+  if (focus) focusPlannerMenuItem(sub || main)
+}
+
+function openPlannerCourseMenu(anchor, { onlySemesters = false, focus = true } = {}) {
+  closePlannerCourseMenu()
+  closePlannerAvailableFilters()
+  const courseId = anchor.dataset.plannerMenuToggle || anchor.dataset.courseId
+  const placement = findPlannerItem(courseId)
+  const course = findPlannerCourse(courseId)
+  if (!course) return
+  plannerCourseMenu = {
+    courseId,
+    anchor,
+    semester: placement?.semester || Number(anchor.dataset.semester) || course.available[0] || CURRENT_SEMESTER,
+    fromDrawer: anchor.hasAttribute('data-course-action-drawer'),
+    submenu: onlySemesters,
+    onlySemesters,
+  }
+  renderPlannerCourseMenu({ focus })
+}
+
+function handlePlannerCourseAction(button) {
+  const action = button.dataset.plannerCourseAction
+  const courseId = button.dataset.courseId
+  if (button.disabled) return
+  if (action === 'semesters') {
+    if (plannerCourseMenu && !button.hasAttribute('data-course-action-drawer')) {
+      plannerCourseMenu.submenu = true
+      renderPlannerCourseMenu({ focus: true })
+    } else openPlannerCourseMenu(button, { onlySemesters: true })
+    return
+  }
+  const fromDrawer = button.hasAttribute('data-course-action-drawer')
+  const semester = Number(button.dataset.semester)
+  closePlannerCourseMenu({ restoreFocus: action === 'about' })
+  if (action === 'about') return openPlannerCourseDrawer(courseId, { semester })
+  if (!applyPlannerCourseAction(courseId, action, Number(button.dataset.targetSemester))) return
+  const placement = findPlannerItem(courseId)
+  const focusSelector = placement ? `[data-planner-course="${courseId}"] [data-planner-menu-toggle]` : `[data-planner-group-toggle="current"][data-semester="${semester}"]`
+  const refresh = () => {
+    renderPlannerPanel({ focusSelector: fromDrawer ? undefined : focusSelector })
+    renderCatalogPanel()
+    if (fromDrawer) previouslyFocused = root.querySelector(focusSelector) || root.querySelector('[data-study-tab="planner"]')
+  }
+  if (fromDrawer && action === 'remove') closeDialog(refresh)
+  else {
+    refresh()
+    if (fromDrawer) openPlannerCourseDrawer(courseId, { refresh: true, focusSelector: `[data-planner-course-action="${action === 'completed' ? 'completed' : 'semesters'}"]`, semester })
+  }
+}
+
+function renderPlannerAvailableGroup(semester, { focusSelector } = {}) {
+  const group = root.querySelector(`[data-planner-course-group="available-${semester}"]`)
+  const content = group?.querySelector('.planner-course-group__panel-inner')
+  if (!content) return
+  content.innerHTML = plannerAvailableCoursesTemplate(semester)
+  const openField = content.querySelector('.ui-multiselect.is-open')
+  if (openField) positionPlannerFilterOptions(openField)
+  if (focusSelector) content.querySelector(focusSelector)?.focus({ preventScroll: true })
+}
+
+function positionPlannerFilterOptions(field) {
+  const options = field.querySelector('.ui-multiselect__options')
+  if (!options || options.hidden) return
+  const rect = options.getBoundingClientRect()
+  if (rect.right > window.innerWidth - 12) options.style.left = `${window.innerWidth - 12 - rect.right}px`
+  if (rect.bottom > window.innerHeight - 12) {
+    const anchor = field.getBoundingClientRect()
+    const below = window.innerHeight - anchor.bottom - 16
+    const above = anchor.top - 16
+    if (above > below) {
+      options.style.top = 'auto'
+      options.style.bottom = 'calc(100% + 4px)'
+      options.style.maxHeight = `${Math.min(280, Math.max(32, above))}px`
+    } else options.style.maxHeight = `${Math.min(280, Math.max(32, below))}px`
+  }
+}
+
+function closePlannerAvailableFilters() {
+  plannerAvailableFilterOpen = null
+  root.querySelectorAll('[data-ui-multiselect^="planner-available-"]').forEach((field) => {
+    field.classList.remove('is-open')
+    field.querySelector('.ui-multiselect__trigger')?.setAttribute('aria-expanded', 'false')
+    const options = field.querySelector('.ui-multiselect__options')
+    if (options) options.hidden = true
+  })
 }
 
 function findPlannerItem(courseId) {
@@ -2582,7 +2858,7 @@ function collapseAllPlannerIslands() {
 function movePlannerCourse(courseId, targetSemester, targetIndex) {
   const source = findPlannerItem(courseId)
   const course = findPlannerCourse(courseId)
-  if (!source || !course || !canMoveToPlannerSemester(targetSemester)) return false
+  if (!source || !course || !course.available.includes(targetSemester) || !canMoveToPlannerSemester(targetSemester)) return false
   if (isPlannerSemesterCompleted(source.semester)) return false
 
   plannerState.semesters[source.semester].splice(source.index, 1)
@@ -2619,7 +2895,7 @@ function openPlannerResetDialog(semester = null) {
   document.querySelector('.planner-dialog').focus()
 }
 
-function openPlannerCourseDrawer(courseId) {
+function openPlannerCourseDrawer(courseId, { refresh = false, focusSelector, semester = null } = {}) {
   const course = findPlannerCourse(courseId)
   const placement = findPlannerItem(courseId)
   if (!course) return
@@ -2641,18 +2917,17 @@ function openPlannerCourseDrawer(courseId) {
   const prerequisiteRows = relationRows(prerequisiteTitles)
   const corequisiteRows = relationRows(corequisiteTitles)
   const postrequisiteRows = postrequisiteTitles.map((title) => `<li class="course-drawer__relation"><img src="${ASSET}course-drawer-postrequisite.svg" width="20" height="20" alt="">${title}</li>`).join('')
-  const addableSemesters = course.available.filter((semester) => !isPlannerSemesterCompleted(semester))
-  const canToggleCompletion = placement && placement.semester >= CURRENT_SEMESTER
-  const showDrawerFooter = canToggleCompletion || (!placement && addableSemesters.length > 0)
-
-  previouslyFocused = document.activeElement
+  const contextSemester = placement?.semester || semester || course.available.find((value) => canMoveToPlannerSemester(value)) || course.available[0] || CURRENT_SEMESTER
+  const previousScroll = refresh ? document.querySelector('.course-drawer__scroll')?.scrollTop || 0 : 0
+  if (!refresh) previouslyFocused = document.activeElement
   document.querySelector('#modal-root').innerHTML = `
-    <div class="modal-backdrop modal-backdrop--sheet" role="presentation">
-      <aside class="course-drawer" role="dialog" aria-modal="true" aria-label="О курсе: ${course.title}" aria-describedby="course-drawer-description" tabindex="-1">
+    <div class="modal-backdrop modal-backdrop--sheet${refresh ? ' is-refresh' : ''}" role="presentation">
+      <aside class="course-drawer${refresh ? ' is-refresh' : ''}" data-course-id="${courseId}" role="dialog" aria-modal="true" aria-label="О курсе: ${course.title}" aria-describedby="course-drawer-description" tabindex="-1">
         ${controlButton({ className: 'goal-dialog__close course-drawer__close', content: icon('course-drawer-close.svg', 24), attributes: 'aria-label="Закрыть" data-close-dialog' })}
         <header class="course-drawer__header">
           <h2 id="course-drawer-title">О курсе</h2>
           <p id="course-drawer-description">${course.title}</p>
+          ${placement?.item.completed ? completedCourseBadge() : ''}
           <img class="course-drawer__character" src="${ASSET}course-drawer-character.png" width="198" height="208" alt="">
         </header>
         <div class="course-drawer__content">
@@ -2692,18 +2967,16 @@ function openPlannerCourseDrawer(courseId) {
               ${postrequisiteRows ? `<ul class="course-drawer__relations">${postrequisiteRows}</ul>` : '<p>Нет</p>'}
             </section>
           </div>
-          ${showDrawerFooter ? '<footer class="course-drawer__footer">' : ''}
-            ${canToggleCompletion
-              ? controlButton({ className: 'flat-button flat-button--primary', content: placement.item.completed ? 'Отметить непройденным' : 'Отметить пройденным', attributes: `data-drawer-toggle-completed data-course-id="${course.id}" data-semester="${placement.semester}"` })
-              : !placement ? `<div class="course-drawer__add-actions" aria-label="Добавить курс в семестр">
-                ${addableSemesters.map((semester) => controlButton({ className: 'flat-button flat-button--primary', content: `${semester} семестр`, attributes: `data-drawer-add-course data-course-id="${course.id}" data-semester="${semester}"` })).join('')}
-              </div>` : ''}
-          ${showDrawerFooter ? '</footer>' : ''}
+          <footer class="course-drawer__footer">
+            ${courseDrawerActionsTemplate(courseId, contextSemester)}
+          </footer>
         </div>
       </aside>
     </div>`
   setModalState(true)
-  document.querySelector('.course-drawer').focus()
+  const drawer = document.querySelector('.course-drawer')
+  drawer.querySelector('.course-drawer__scroll').scrollTop = previousScroll
+  ;(focusSelector ? drawer.querySelector(focusSelector) || drawer : drawer).focus({ preventScroll: true })
 }
 
 function openPlannerTrajectoryDialog() {
@@ -2780,6 +3053,8 @@ function resetPlanner({ semester = null, keepCompleted = true } = {}) {
 
 function activateStudyTab(tab, { focus = false } = {}) {
   const tablist = tab.closest('[data-study-tabs]')
+  closePlannerCourseMenu()
+  closePlannerAvailableFilters()
   const target = tab.dataset.studyTab
 
   tablist.querySelectorAll('[data-study-tab]').forEach((item) => {
@@ -2870,6 +3145,10 @@ function restartScenario() {
   catalogRequisites.clear()
   catalogStatuses.clear()
   catalogFilterOpen = null
+  plannerAvailableFilters.clear()
+  plannerAvailableLimits.clear()
+  plannerAvailableFilterOpen = null
+  closePlannerCourseMenu()
   collapsedCatalogGroups.clear()
   openGlossaryTerms.clear()
   requestedStudyTab = null
@@ -2974,6 +3253,63 @@ function closeCatalogFilters() {
 }
 
 root.addEventListener('click', (event) => {
+  const statisticsToggle = event.target.closest('[data-planner-statistics-toggle]')
+  if (statisticsToggle) {
+    const expanded = statisticsToggle.getAttribute('aria-expanded') !== 'true'
+    plannerState.statisticsCollapsed = !expanded
+    savePlannerState()
+    statisticsToggle.setAttribute('aria-expanded', String(expanded))
+    const island = statisticsToggle.closest('.planner-statistics')
+    island.classList.toggle('planner-statistics--expanded', expanded)
+    const panel = island.querySelector('.planner-statistics__panel')
+    panel.setAttribute('aria-hidden', String(!expanded))
+    panel.inert = !expanded
+    return
+  }
+  const courseMenuToggle = event.target.closest('[data-planner-menu-toggle]')
+  if (courseMenuToggle) {
+    if (plannerCourseMenu?.anchor === courseMenuToggle) closePlannerCourseMenu({ restoreFocus: true })
+    else openPlannerCourseMenu(courseMenuToggle)
+    return
+  }
+  const courseAction = event.target.closest('[data-planner-course-action]')
+  if (courseAction) {
+    handlePlannerCourseAction(courseAction)
+    return
+  }
+  if (event.target.closest('[data-planner-menu-back]')) {
+    plannerCourseMenu.submenu = false
+    renderPlannerCourseMenu({ focus: true })
+    return
+  }
+  const plannerFilterToggle = event.target.closest('[data-planner-filter-toggle]')
+  if (plannerFilterToggle) {
+    const semester = Number(plannerFilterToggle.dataset.plannerFilterToggle)
+    const filter = plannerFilterToggle.dataset.filterName
+    const wasOpen = plannerAvailableFilterOpen?.semester === semester && plannerAvailableFilterOpen.filter === filter
+    closePlannerCourseMenu()
+    closeCatalogFilters()
+    closePlannerAvailableFilters()
+    plannerAvailableFilterOpen = wasOpen ? null : { semester, filter }
+    renderPlannerAvailableGroup(semester, { focusSelector: `[data-planner-filter-toggle="${semester}"][data-filter-name="${filter}"]` })
+    return
+  }
+  const plannerFilterReset = event.target.closest('[data-planner-filter-reset]')
+  if (plannerFilterReset) {
+    const semester = Number(plannerFilterReset.dataset.plannerFilterReset)
+    plannerAvailableFilters.set(semester, createCourseFilters())
+    plannerAvailableLimits.set(semester, 8)
+    closePlannerAvailableFilters()
+    renderPlannerAvailableGroup(semester, { focusSelector: `[data-planner-filter-toggle="${semester}"]` })
+    return
+  }
+  const availableMore = event.target.closest('[data-planner-available-more]')
+  if (availableMore) {
+    const semester = Number(availableMore.dataset.plannerAvailableMore)
+    plannerAvailableLimits.set(semester, (plannerAvailableLimits.get(semester) || 8) + 8)
+    renderPlannerAvailableGroup(semester, { focusSelector: `[data-planner-available-more="${semester}"]` })
+    return
+  }
   if (event.target.closest('[data-restart-scenario]')) {
     restartScenario()
     return
@@ -3478,15 +3814,6 @@ root.addEventListener('click', (event) => {
     }
   }
 
-  const plannerRemove = event.target.closest('[data-planner-remove]')
-  if (plannerRemove) {
-    const semester = Number(plannerRemove.dataset.semester)
-    if (isPlannerSemesterCompleted(semester)) return
-    plannerState.semesters[semester] = plannerState.semesters[semester].filter((item) => item.id !== plannerRemove.dataset.courseId || item.fixed)
-    savePlannerState()
-    renderPlannerPanel({ focusSelector: `[data-planner-group-toggle="current"][data-semester="${semester}"]` })
-  }
-
   const plannerResetSemester = event.target.closest('[data-planner-reset-semester]')
   if (plannerResetSemester) {
     const semester = Number(plannerResetSemester.dataset.plannerResetSemester)
@@ -3502,32 +3829,6 @@ root.addEventListener('click', (event) => {
     const keepCompleted = Boolean(semester)
     resetPlanner({ semester, keepCompleted })
     closeDialog(() => renderPlannerPanel({ focusSelector: semester ? `[data-planner-group-toggle="current"][data-semester="${semester}"]` : '[data-planner-reset-all]' }))
-  }
-
-  const drawerToggleCompleted = event.target.closest('[data-drawer-toggle-completed]')
-  if (drawerToggleCompleted) {
-    const semester = Number(drawerToggleCompleted.dataset.semester)
-    if (semester < CURRENT_SEMESTER) return
-    const item = plannerState.semesters[semester].find((course) => course.id === drawerToggleCompleted.dataset.courseId)
-    if (item) {
-      item.completed = !item.completed
-      savePlannerState()
-      closeDialog(() => renderPlannerPanel({ focusSelector: `[data-planner-course="${item.id}"]` }))
-    }
-  }
-
-  const drawerAddCourse = event.target.closest('[data-drawer-add-course]')
-  if (drawerAddCourse) {
-    const courseId = drawerAddCourse.dataset.courseId
-    const semester = Number(drawerAddCourse.dataset.semester)
-    const course = findPlannerCourse(courseId)
-    if (course?.available.includes(semester) && !isPlannerSemesterCompleted(semester) && !getPlannedCourseIds().has(courseId)) {
-      plannerState.semesters[semester].push({ id: courseId, completed: false, fixed: false })
-      plannerState.collapsedSemesters = plannerState.collapsedSemesters.filter((value) => value !== semester)
-      plannerState.collapsedCourseGroups = plannerState.collapsedCourseGroups.filter((value) => value !== semester)
-      savePlannerState()
-      closeDialog(() => renderCatalogPanel({ focusSelector: `[data-catalog-course-open="${courseId}"]` }))
-    }
   }
 
   if (event.target.closest('[data-select-goal]')) {
@@ -3576,6 +3877,8 @@ root.addEventListener('click', (event) => {
 })
 
 document.addEventListener('click', (event) => {
+  if (!event.target.closest('#planner-course-menu, [data-planner-menu-toggle], [data-planner-course-action="semesters"], [data-planner-menu-back]')) closePlannerCourseMenu()
+  if (!event.target.closest('[data-ui-multiselect^="planner-available-"], [data-planner-filter-toggle]')) closePlannerAvailableFilters()
   if (!event.target.closest('[data-ui-select]')) closeAllSingleSelects()
   if (!event.target.closest('[data-ui-date]')) closeAllApplicationDatePickers()
   if (!event.target.closest('[data-ui-multiselect]')) closeVacancyDirectionSelect()
@@ -3592,6 +3895,33 @@ document.addEventListener('click', (event) => {
 })
 
 root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-ui-select-checkbox]')) {
+    const field = event.target.closest('[data-ui-select]')
+    const select = field.querySelector('select')
+    const option = [...select.options].find((item) => item.value === event.target.value)
+    if (select.disabled || !option) return
+    option.selected = event.target.checked
+    event.target.closest('.ui-select__option').classList.toggle('is-selected', event.target.checked)
+    const trigger = field.querySelector('[data-ui-select-toggle]')
+    const displayValue = [...select.selectedOptions].map((item) => item.textContent).join(', ')
+    trigger.querySelector('span:first-child').textContent = displayValue || trigger.dataset.placeholder
+    trigger.querySelector('span:first-child').classList.toggle('is-placeholder', !displayValue)
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    return
+  }
+  const plannerFilter = event.target.dataset.uiMultiselectOption?.match(/^planner-available-(\d+)-(.+)$/)
+  if (plannerFilter) {
+    const semester = Number(plannerFilter[1])
+    const filter = plannerFilter[2]
+    const target = getAvailableCourseFilters(semester)[filter]
+    const value = ['semester', 'workload'].includes(filter) ? Number(event.target.value) : event.target.value
+    if (event.target.checked) target.add(value)
+    else target.delete(value)
+    plannerAvailableLimits.set(semester, 8)
+    plannerAvailableFilterOpen = { semester, filter }
+    renderPlannerAvailableGroup(semester, { focusSelector: `[data-ui-multiselect-option="planner-available-${semester}-${filter}"][value="${CSS.escape(event.target.value)}"]` })
+    return
+  }
   if (event.target.matches('[data-study-task]')) updateStudyProgress()
   if (event.target.matches('[data-industry-task]')) updateIndustryProgress()
 
@@ -3657,14 +3987,6 @@ root.addEventListener('change', (event) => {
     renderApplicationsPanel({ focusSelector: `[data-ui-multiselect-option="application-${filter}"][value="${event.target.value}"]` })
   }
 
-  if (event.target.matches('[data-planner-completed]')) {
-    const semester = Number(event.target.dataset.semester)
-    const item = plannerState.semesters[semester].find((course) => course.id === event.target.dataset.courseId)
-    if (item) item.completed = event.target.checked
-    savePlannerState()
-    renderPlannerPanel({ focusSelector: `[data-planner-completed][data-course-id="${event.target.dataset.courseId}"]` })
-  }
-
   if (event.target.matches('[data-planner-hide-completed]')) {
     plannerState.hideCompletedSemesters = event.target.checked
     savePlannerState()
@@ -3681,6 +4003,7 @@ root.addEventListener('change', (event) => {
     root.querySelectorAll('[data-ui-field]').forEach((field) => {
       field.disabled = event.target.checked
       field.closest('[data-ui-select]')?.querySelector('[data-ui-select-toggle]')?.toggleAttribute('disabled', event.target.checked)
+      field.closest('[data-ui-select]')?.querySelectorAll('[data-ui-select-checkbox]').forEach((checkbox) => { checkbox.disabled = event.target.checked })
       field.closest('.ui-field').classList.toggle('ui-field--disabled', event.target.checked)
       clearWorkFieldValidation(field)
     })
@@ -3691,6 +4014,7 @@ root.addEventListener('change', (event) => {
     root.querySelectorAll('[data-ui-field]').forEach((field) => {
       field.disabled = event.target.checked
       field.closest('[data-ui-select]')?.querySelector('[data-ui-select-toggle]')?.toggleAttribute('disabled', event.target.checked)
+      field.closest('[data-ui-select]')?.querySelectorAll('[data-ui-select-checkbox]').forEach((checkbox) => { checkbox.disabled = event.target.checked })
       field.closest('.ui-field').classList.toggle('ui-field--disabled', event.target.checked)
       clearWorkFieldValidation(field)
     })
@@ -3982,9 +4306,10 @@ document.addEventListener('keydown', (event) => {
 })
 
 root.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || event.target.closest('.planner-course__footer')) return
+  if (event.button !== 0 || event.target.closest('.planner-course__footer, [data-planner-menu-toggle], #planner-course-menu')) return
   const card = event.target.closest('[data-planner-drag-handle]')
   if (!card) return
+  closePlannerCourseMenu()
   const sourceSemester = Number(card.dataset.plannerSemester)
   if (sourceSemester && isPlannerSemesterCompleted(sourceSemester)) return
 
@@ -4049,7 +4374,7 @@ root.addEventListener('pointermove', (event) => {
   if (!dropzone) return
   const course = findPlannerCourse(pointerPlannerDrag.id)
   const semester = Number(dropzone.dataset.plannerDropzone)
-  if (!course || !canMoveToPlannerSemester(semester)) return
+  if (!course || !course.available.includes(semester) || !canMoveToPlannerSemester(semester)) return
   dropzone.classList.add('is-drag-over')
 })
 
@@ -4071,7 +4396,7 @@ root.addEventListener('pointerup', (event) => {
   }
   const semester = Number(dropzone.dataset.plannerDropzone)
   const course = findPlannerCourse(drag.id)
-  if (!course || !canMoveToPlannerSemester(semester)) {
+  if (!course || !course.available.includes(semester) || !canMoveToPlannerSemester(semester)) {
     clearPlannerPointerDrag()
     renderPlannerPanel()
     return
@@ -4103,10 +4428,48 @@ root.addEventListener('pointercancel', cancelPlannerPointerDrag)
 window.addEventListener('blur', cancelPlannerPointerDrag)
 
 root.addEventListener('keydown', (event) => {
+  const menu = event.target.closest('#planner-course-menu [role="menu"]')
+  if (menu && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape', 'Tab'].includes(event.key)) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.key === 'Escape' || event.key === 'Tab') return closePlannerCourseMenu({ restoreFocus: true })
+    if (event.key === 'ArrowLeft') {
+      if (plannerCourseMenu.submenu && !plannerCourseMenu.onlySemesters) {
+        plannerCourseMenu.submenu = false
+        renderPlannerCourseMenu()
+        root.querySelector('#planner-course-context-menu [data-planner-course-action="semesters"]')?.focus()
+      } else closePlannerCourseMenu({ restoreFocus: true })
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      if (event.target.dataset.plannerCourseAction === 'semesters') handlePlannerCourseAction(event.target)
+      return
+    }
+    const items = [...menu.querySelectorAll('[role="menuitem"]:not(:disabled)')]
+    const current = items.indexOf(event.target)
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+      : event.key === 'ArrowDown' ? (current + 1) % items.length : (current - 1 + items.length) % items.length
+    items[index]?.focus({ preventScroll: true })
+    return
+  }
+  const courseMenuToggle = event.target.closest('[data-planner-menu-toggle]')
+  if (courseMenuToggle && !event.altKey && !event.ctrlKey && !event.metaKey && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+    event.preventDefault()
+    openPlannerCourseMenu(courseMenuToggle)
+    if (event.key === 'ArrowUp') focusPlannerMenuItem(root.querySelector('#planner-course-context-menu'), true)
+    return
+  }
+  const availableFilter = event.target.closest('[data-ui-multiselect^="planner-available-"]')
+  if (availableFilter && event.key === 'Escape') {
+    event.preventDefault()
+    closePlannerAvailableFilters()
+    availableFilter.querySelector('.ui-multiselect__trigger').focus()
+    return
+  }
   const selectField = event.target.closest('[data-ui-select]')
   if (selectField?.querySelector('select')?.multiple) {
     const trigger = selectField.querySelector('[data-ui-select-toggle]')
-    const options = [...selectField.querySelectorAll('[data-ui-select-option]')]
+    const options = [...selectField.querySelectorAll('[data-ui-select-option], [data-ui-select-checkbox]')]
     if (event.key === 'Escape') {
       event.preventDefault()
       closeSingleSelect(selectField)
@@ -4155,10 +4518,11 @@ root.addEventListener('keydown', (event) => {
     let targetIndex
     if (event.key === 'ArrowLeft') targetIndex = Math.max(0, source.index - 1)
     if (event.key === 'ArrowRight') targetIndex = Math.min(plannerState.semesters[source.semester].length - 1, source.index + 1)
-    if (event.key === 'ArrowUp') targetSemester = Array.from({ length: source.semester - CURRENT_SEMESTER }, (_, index) => source.semester - index - 1).find(canMoveToPlannerSemester) ?? source.semester
-    if (event.key === 'ArrowDown') targetSemester = Array.from({ length: 8 - source.semester }, (_, index) => source.semester + index + 1).find(canMoveToPlannerSemester) ?? source.semester
+    const eligible = (semester) => course.available.includes(semester) && canMoveToPlannerSemester(semester)
+    if (event.key === 'ArrowUp') targetSemester = Array.from({ length: source.semester - CURRENT_SEMESTER }, (_, index) => source.semester - index - 1).find(eligible) ?? source.semester
+    if (event.key === 'ArrowDown') targetSemester = Array.from({ length: 8 - source.semester }, (_, index) => source.semester + index + 1).find(eligible) ?? source.semester
 
-    if (targetSemester !== source.semester || targetIndex !== source.index) {
+    if (targetSemester !== source.semester || (Number.isInteger(targetIndex) && targetIndex !== source.index)) {
       collapseAllPlannerIslands()
       movePlannerCourse(course.id, targetSemester, targetIndex)
       renderPlannerDropResult(course.id, targetSemester)
@@ -4181,3 +4545,7 @@ root.addEventListener('keydown', (event) => {
 })
 
 window.addEventListener('resize', () => syncStudyTabIndicator(root.querySelector('[data-study-tabs]'), { animate: false }))
+window.addEventListener('resize', () => closePlannerCourseMenu())
+document.addEventListener('scroll', (event) => {
+  if (plannerCourseMenu && !event.target.closest?.('#planner-course-menu')) closePlannerCourseMenu()
+}, true)

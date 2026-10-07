@@ -21,10 +21,23 @@ export function controlButton({ content, className = '', variant = '', type = 'b
   const variantClasses = {
     flat: 'flat-button flat-button--neutral',
     'flat-destructive': 'flat-button flat-button--destructive',
+    'context-trigger': 'ui-context-trigger',
   }
   const classes = [...new Set(`${variantClasses[variant] || ''} ${className}`.trim().split(/\s+/))].filter(Boolean).join(' ')
   const classAttribute = classes ? ` class="${classes}"` : ''
   return `<button${classAttribute} type="${type}"${attributes(extraAttributes)}>${content}</button>`
+}
+
+export function contextMenuControl({ id, label, items }) {
+  return `<div class="ui-context-menu" id="${id}" role="menu" aria-label="${escapeAttribute(label)}">
+    ${items.map((item) => item.separator
+      ? '<div class="ui-context-menu__divider" role="separator"></div>'
+      : controlButton({
+        className: `ui-context-menu__item${item.destructive ? ' ui-context-menu__item--destructive' : ''}`,
+        content: `${item.iconContent || ''}<span>${escapeAttribute(item.label)}</span>${item.trailingContent || ''}`,
+        attributes: `role="menuitem" tabindex="-1"${item.disabled ? ' disabled' : ''}${attributes(item.attributes || '')}`,
+      })).join('')}
+  </div>`
 }
 
 export function checkboxControl({
@@ -64,7 +77,7 @@ export function chipControl({ label, selected = false, attributes: extraAttribut
   })
 }
 
-export function fieldControl({ id, label, placeholder, options, multiple = false, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
+export function fieldControl({ id, label, placeholder, options, multiple = false, checkContent = '', required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
   const validation = required ? ' required' : ''
   const error = errorMessage || 'Заполни поле'
   const extraAttributes = attributes(inputAttributes)
@@ -117,10 +130,15 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
           ${controlButton({
             className: 'ui-select__trigger',
             content: `<span class="${displayValue ? '' : 'is-placeholder'}">${escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
-            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}" data-placeholder="${escapeAttribute(placeholder)}"${disabled ? ' disabled' : ''}`,
+            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger"${multiple ? '' : ' aria-haspopup="listbox"'} aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}" data-placeholder="${escapeAttribute(placeholder)}"${disabled ? ' disabled' : ''}`,
           })}
-          <span class="ui-select__options" id="${id}-options" role="listbox"${multiple ? ' aria-multiselectable="true"' : ''} aria-labelledby="${id}-label" hidden>
-            ${normalizedOptions.map((option) => controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
+          <span class="ui-select__options" id="${id}-options" role="${multiple ? 'group' : 'listbox'}" aria-labelledby="${id}-label" hidden>
+            ${normalizedOptions.map((option) => multiple ? checkboxControl({
+              className: `ui-select__option ui-select__option--multiple ${selectedValues.has(option.value) ? 'is-selected' : ''}`,
+              inputAttributes: `data-ui-select-checkbox="${id}" value="${escapeAttribute(option.value)}"${selectedValues.has(option.value) ? ' checked' : ''}${disabled ? ' disabled' : ''}`,
+              boxContent: checkContent,
+              content: `<span>${escapeAttribute(option.label)}</span>`,
+            }) : controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
           </span>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
