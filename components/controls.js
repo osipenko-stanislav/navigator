@@ -17,8 +17,13 @@ function formatDateValue(value = '') {
   return `${day}.${month}.${year.slice(-2)}`
 }
 
-export function controlButton({ content, className = '', type = 'button', attributes: extraAttributes = '' }) {
-  const classAttribute = className ? ` class="${className}"` : ''
+export function controlButton({ content, className = '', variant = '', type = 'button', attributes: extraAttributes = '' }) {
+  const variantClasses = {
+    flat: 'flat-button flat-button--neutral',
+    'flat-destructive': 'flat-button flat-button--destructive',
+  }
+  const classes = [...new Set(`${variantClasses[variant] || ''} ${className}`.trim().split(/\s+/))].filter(Boolean).join(' ')
+  const classAttribute = classes ? ` class="${classes}"` : ''
   return `<button${classAttribute} type="${type}"${attributes(extraAttributes)}>${content}</button>`
 }
 
@@ -59,7 +64,7 @@ export function chipControl({ label, selected = false, attributes: extraAttribut
   })
 }
 
-export function fieldControl({ id, label, placeholder, options, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
+export function fieldControl({ id, label, placeholder, options, multiple = false, required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
   const validation = required ? ' required' : ''
   const error = errorMessage || 'Заполни поле'
   const extraAttributes = attributes(inputAttributes)
@@ -99,23 +104,23 @@ export function fieldControl({ id, label, placeholder, options, required = true,
   }
 
   if (options) {
-    const selectedOption = normalizedOptions.find((option) => option.value === String(value))
-    const displayValue = selectedOption?.label || ''
+    const selectedValues = new Set(multiple ? (Array.isArray(value) ? value : value ? [String(value)] : []) : [String(value)])
+    const displayValue = normalizedOptions.filter((option) => selectedValues.has(option.value)).map((option) => option.label).join(', ')
     return `
       <div class="${classes}" data-ui-select="${id}">
         <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
         <span class="ui-field__control ui-field__control--select">
-          <select class="visually-hidden" id="${id}" name="${id}" data-ui-field${validation}${extraAttributes} tabindex="-1" aria-hidden="true">
-            <option value="" ${value ? '' : 'selected'} disabled>${placeholder}</option>
-            ${normalizedOptions.map((option) => `<option value="${escapeAttribute(option.value)}" ${option.value === String(value) ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`).join('')}
+          <select class="visually-hidden" id="${id}" name="${id}" data-ui-field${multiple ? ' multiple' : ''}${validation}${extraAttributes} tabindex="-1" aria-hidden="true">
+            ${multiple ? '' : `<option value="" ${value ? '' : 'selected'} disabled>${placeholder}</option>`}
+            ${normalizedOptions.map((option) => `<option value="${escapeAttribute(option.value)}" ${selectedValues.has(option.value) ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`).join('')}
           </select>
           ${controlButton({
             className: 'ui-select__trigger',
             content: `<span class="${displayValue ? '' : 'is-placeholder'}">${escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
-            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}"${disabled ? ' disabled' : ''}`,
+            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}" data-placeholder="${escapeAttribute(placeholder)}"${disabled ? ' disabled' : ''}`,
           })}
-          <span class="ui-select__options" id="${id}-options" role="listbox" aria-labelledby="${id}-label" hidden>
-            ${normalizedOptions.map((option) => controlButton({ className: `ui-select__option ${option.value === String(value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${option.value === String(value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
+          <span class="ui-select__options" id="${id}-options" role="listbox"${multiple ? ' aria-multiselectable="true"' : ''} aria-labelledby="${id}-label" hidden>
+            ${normalizedOptions.map((option) => controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
           </span>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>

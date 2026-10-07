@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=16'
+import { checkboxControl, chipControl, controlButton, fieldControl, fileControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=18'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -25,13 +25,14 @@ const APPLICATIONS_STORAGE_KEY = 'cpk:industry-applications'
 const PORTFOLIO_PROFILES_STORAGE_KEY = 'cpk:industry-portfolio-profiles'
 const GOAL_FORM_VALUES_KEY = 'cpk:goal-form-values'
 const PORTFOLIO_PROFILE_TONES = ['sure-blue', 'sure-pink', 'optimistic-t-yellow', 'care-tiny', 'care-violet', 'expert-blue', 'expert-orange']
-const GOALS_WITH_JOB_EXPECTATIONS_STEP = new Set(['first-job', 'freelance', 'change-company', 'change-specialty'])
+const ONBOARDING_KEY = 'cpk:career-onboarding'
+const GOAL_SELECTION_KEY = 'cpk:goal-selection-draft'
 const SHOW_GOAL_INFO_DIALOG = false
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
 const PLANNER_COURSE_TARGET = 24
 const PLANNER_CREDIT_TARGET = 60
-const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', 'Более 200 000']
+const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', '200 000–300 000', 'Более 300 000']
 const APPLICATION_STATUSES = ['Новый', 'На рассмотрении', 'Интервью', 'Тестовое', 'Тех. собес', 'Оффер', 'Отказ', 'В архиве']
 
 const studyStages = [
@@ -240,7 +241,8 @@ function normalizeApplicationSalary(value = '') {
   if (amount < 50000) return CAREER_SALARY_OPTIONS[0]
   if (amount <= 100000) return CAREER_SALARY_OPTIONS[1]
   if (amount <= 200000) return CAREER_SALARY_OPTIONS[2]
-  return CAREER_SALARY_OPTIONS[3]
+  if (amount <= 300000) return CAREER_SALARY_OPTIONS[3]
+  return CAREER_SALARY_OPTIONS[4]
 }
 
 function previousApplicationDate(daysAgo) {
@@ -338,24 +340,36 @@ function savePortfolioProfiles() {
   try { window.localStorage.setItem(PORTFOLIO_PROFILES_STORAGE_KEY, JSON.stringify(portfolioProfiles)) } catch { /* Keep the session interactive. */ }
 }
 
-function getGoalFormValues(goalId = getPendingGoal()?.id) {
-  if (!goalId) return {}
+function getOnboarding() {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
-    return saved && typeof saved === 'object' ? saved[goalId] || {} : {}
-  } catch {
-    return {}
-  }
+    const saved = JSON.parse(window.localStorage.getItem(ONBOARDING_KEY) || 'null')
+    if (saved && typeof saved === 'object') return saved
+    // Existing students keep their previously entered career information.
+    const goalId = getSavedGoalIds()[0]
+    if (goalId) {
+      const legacy = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
+      return { values: legacy?.[goalId] || {}, completed: true, ready: true, workReady: true, goalsChosen: true }
+    }
+  } catch { /* Use an empty onboarding when stored data is unavailable. */ }
+  return { values: {}, completed: false, ready: false }
+}
+
+function getGoalFormValues() {
+  return getOnboarding().values || {}
+}
+
+function isEditingOnboarding() {
+  return getOnboarding().completed && new URLSearchParams(window.location.search).get('edit') === 'onboarding'
+}
+
+function saveOnboarding(data) {
+  window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(data))
 }
 
 function saveGoalFormValues(form) {
-  const goalId = getPendingGoal()?.id
-  if (!goalId) return
-
   try {
-    const saved = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
-    const current = saved && typeof saved === 'object' ? saved : {}
-    const previous = current[goalId] || {}
+    const onboarding = getOnboarding()
+    const previous = onboarding.values || {}
     const firstStep = form.querySelector('#company')
     const values = firstStep ? {
       ...previous,
@@ -368,12 +382,11 @@ function saveGoalFormValues(form) {
       ...previous,
       noExpectations: Boolean(form.querySelector('[data-no-expectations]')?.checked),
       desiredCompany: form.querySelector('#desired-company')?.value || '',
-      desiredSpecialty: form.querySelector('#desired-specialty')?.value || '',
+      desiredSpecialty: [...(form.querySelector('#desired-specialty')?.selectedOptions || [])].map((option) => option.value),
       desiredGrade: form.querySelector('#desired-grade')?.value || '',
       desiredSalary: form.querySelector('#desired-salary')?.value || '',
     }
-    current[goalId] = values
-    window.localStorage.setItem(GOAL_FORM_VALUES_KEY, JSON.stringify(current))
+    saveOnboarding({ ...onboarding, values, ...(firstStep ? { workReady: true, ready: onboarding.completed } : {}) })
   } catch {
     // Form editing still works for the current visit when storage is unavailable.
   }
@@ -652,7 +665,13 @@ function getIndustryProgressSummary(progress = getIndustryProgress()) {
 function getSavedGoalIds() {
   try {
     const ids = JSON.parse(window.localStorage.getItem(SAVED_GOALS_KEY) || '[]')
-    return Array.isArray(ids) ? ids.filter((id) => goals.some((goal) => goal.id === id)).slice(0, MAX_GOALS) : []
+    const tracks = new Set()
+    return Array.isArray(ids) ? ids.filter((id) => {
+      const goal = goals.find((item) => item.id === id && !item.comingSoon)
+      if (!goal || tracks.has(goal.kind)) return false
+      tracks.add(goal.kind)
+      return true
+    }).slice(0, MAX_GOALS) : []
   } catch {
     return []
   }
@@ -676,23 +695,44 @@ function getPendingGoal() {
   }
 }
 
-function pendingGoalHasJobExpectationsStep() {
-  return GOALS_WITH_JOB_EXPECTATIONS_STEP.has(getPendingGoal()?.id)
+function getGoalSelection() {
+  try {
+    const ids = JSON.parse(window.localStorage.getItem(GOAL_SELECTION_KEY) || '[]')
+    const saved = getSavedGoals()
+    const tracks = new Set(saved.map((goal) => goal.kind))
+    return Array.isArray(ids) ? ids.filter((id) => {
+      const goal = goals.find((item) => item.id === id && !item.comingSoon)
+      if (!goal || tracks.has(goal.kind)) return false
+      tracks.add(goal.kind)
+      return true
+    }).slice(0, MAX_GOALS - saved.length) : []
+  } catch { return [] }
 }
 
-function commitPendingGoal() {
-  const pendingId = window.localStorage.getItem(PENDING_GOAL_KEY)
-  const goal = goals.find((item) => item.id === pendingId && !item.comingSoon)
-  const savedGoals = getSavedGoals()
-  const savedIds = savedGoals.map((item) => item.id)
-  const trackAlreadyUsed = savedGoals.some((item) => item.kind === goal?.kind)
-
-  if (goal && !trackAlreadyUsed && !savedIds.includes(goal.id) && savedIds.length < MAX_GOALS) {
-    savedIds.push(goal.id)
-    window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify(savedIds))
-  }
-
+function commitGoalSelection() {
+  if (!getOnboarding().ready) return false
+  const selected = getGoalSelection()
+  if (!selected.length) return false
+  const saved = getSavedGoalIds()
+  selected.forEach((id) => {
+    const goal = goals.find((item) => item.id === id)
+    window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : INDUSTRY_PROGRESS_KEY)
+    if (goal.kind === 'study') {
+      window.localStorage.removeItem(PLANNER_STORAGE_KEY)
+      plannerState = createDefaultPlannerState()
+    }
+  })
+  window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify([...saved, ...selected]))
+  saveOnboarding({ ...getOnboarding(), completed: true, ready: true, goalsChosen: true })
+  window.localStorage.removeItem(GOAL_SELECTION_KEY)
   window.localStorage.removeItem(PENDING_GOAL_KEY)
+  return true
+}
+
+function resetGoalJourney() {
+  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, PLANNER_STORAGE_KEY]
+    .forEach((key) => window.localStorage.removeItem(key))
+  plannerState = createDefaultPlannerState()
 }
 
 const iconByKind = {
@@ -840,6 +880,7 @@ function navigatorGoalsHeader() {
         <div class="header-island__actions">
           ${controlButton({ className: 'flat-button flat-button--primary header-island__goal-action', content: `${icon('plus.svg', 20)}<span>Добавить цель</span>`, attributes: 'data-add-goal' })}
           ${controlButton({ className: 'flat-button flat-button--outline header-island__consultation-action', content: `${icon('message-chat-square.svg', 20)}<span>Хочу консультацию</span>` })}
+          ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать данные', attributes: 'data-edit-onboarding' })}
         </div>
       </div>
       <div class="header-island__art header-island__art--goals" aria-hidden="true">${icon('goals-header-illustration.svg', 389, 'header-island__art-image')}</div>
@@ -848,12 +889,13 @@ function navigatorGoalsHeader() {
 
 function goalCard(goal) {
   const savedGoals = getSavedGoals()
-  const selected = savedGoals.some((item) => item.id === goal.id)
-  const trackAlreadyUsed = savedGoals.some((item) => item.kind === goal.kind)
-  const unavailable = goal.comingSoon || trackAlreadyUsed || savedGoals.length >= MAX_GOALS
+  const draft = getGoalSelection()
+  const selected = savedGoals.some((item) => item.id === goal.id) || draft.includes(goal.id)
+  const trackAlreadyUsed = savedGoals.some((item) => item.kind === goal.kind) || draft.some((id) => id !== goal.id && goals.find((item) => item.id === id)?.kind === goal.kind)
+  const unavailable = goal.comingSoon || trackAlreadyUsed || (!selected && savedGoals.length + draft.length >= MAX_GOALS) || savedGoals.some((item) => item.id === goal.id)
   return controlButton({
     className: `goal-card ${selected ? 'goal-card--selected' : ''}`,
-    attributes: `data-goal-id="${goal.id}" ${unavailable ? `disabled ${goal.comingSoon ? `aria-describedby="${goal.id}-state"` : ''}` : ''}`,
+    attributes: `aria-pressed="${selected}" data-goal-id="${goal.id}" ${unavailable ? `disabled ${goal.comingSoon ? `aria-describedby="${goal.id}-state"` : ''}` : ''}`,
     content: `<span class="goal-card__heading">
         <span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(selected ? 'check-verified.svg' : iconByKind[goal.kind])}</span>
         <span class="goal-card__category">${goal.category}</span>
@@ -885,21 +927,20 @@ function infoPanel() {
     </aside>`
 }
 
-function appTemplate() {
+function invitationTemplate() {
   return `
     <div class="app-shell">
-      ${globalNav()}
-      ${mobileNav()}
-      ${informerFooter()}
+      ${globalNav()}${mobileNav()}${informerFooter()}
       <main class="page-content">
         ${headerIsland()}
         <div class="workspace">
-          <section class="goal-panel" aria-labelledby="goals-heading">
-            <div class="section-heading">
-              <h2 id="goals-heading" tabindex="-1">Выбери цель</h2>
-              <p>Определи, что для тебя сейчас в приоритете: индустрия,<br class="desktop-break"> предпринимательство, наука или только обучение.</p>
+          <section class="portfolio-empty goal-invitation" aria-labelledby="invitation-title">
+            <div class="portfolio-empty__copy">
+              <h2 id="invitation-title" tabindex="-1">Выбери, к чему хочешь прийти</h2>
+              <p>${getOnboarding().completed ? 'Выбери до двух целей, чтобы спланировать учебу и карьерные шаги. Данные о работе и ожиданиях сохранены — их можно изменить позже.' : 'Расскажи о своей работе и ожиданиях, а затем выбери до двух целей. Они помогут спланировать учебу и карьерные шаги. Данные и цели можно изменить позже.'}</p>
             </div>
-            <div class="goal-grid">${goals.map(goalCard).join('')}</div>
+            ${controlButton({ className: 'flat-button flat-button--primary', content: 'Выбрать цель', attributes: 'data-start-onboarding' })}
+            ${getOnboarding().completed ? controlButton({ className: 'flat-button flat-button--outline', content: 'Редактировать данные', attributes: 'data-edit-onboarding' }) : ''}
           </section>
           ${infoPanel()}
         </div>
@@ -908,8 +949,36 @@ function appTemplate() {
     </div>`
 }
 
+function appTemplate() {
+  return `
+    <div class="app-shell">
+      ${globalNav()}
+      ${mobileNav({ backButton: true, backTarget: 'selection' })}
+      ${informerFooter()}
+      <main class="page-content work-step">
+        ${journeyHeader({ backAttributes: 'data-selection-back' })}
+        ${privacyNote()}
+        <div class="work-step__layout">
+          <section class="work-form work-form--goals" aria-labelledby="goals-heading">
+            <div class="work-form__heading">
+              ${getOnboarding().goalsChosen ? '' : '<span>Шаг 3 из 3</span>'}
+              <h2 id="goals-heading" tabindex="-1">${getSavedGoals().length ? 'Добавь вторую цель' : 'Выбери цели'}</h2>
+              <p class="work-form__description">Выбери до двух целей: одну в Индустрии и одну в Учебе.</p>
+            </div>
+            <div class="goal-grid">${goals.map(goalCard).join('')}</div>
+            <div class="work-form__actions">
+              ${controlButton({ className: 'flat-button flat-button--outline', content: 'Назад', attributes: 'data-selection-back' })}
+              ${controlButton({ className: 'flat-button flat-button--primary', content: getSavedGoals().length ? 'Добавить цель' : 'Продолжить', attributes: `data-confirm-goal-selection ${getGoalSelection().length ? '' : 'disabled'}` })}
+            </div>
+          </section>
+        </div>
+      </main>
+      <div id="modal-root"></div>
+    </div>`
+}
+
 function workExperienceTemplate() {
-  const hasSecondStep = pendingGoalHasJobExpectationsStep()
+  const editing = isEditingOnboarding()
   const values = getGoalFormValues()
   const fieldsDisabled = values.noWork ? 'disabled' : ''
   return `
@@ -919,7 +988,7 @@ function workExperienceTemplate() {
       ${informerFooter()}
       <main class="page-content work-step">
         <div class="work-step__header">
-          ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>К выбору цели</span>`, attributes: 'data-back-to-goals' })}
+          ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>${isEditingOnboarding() ? 'К целям' : 'Назад'}</span>`, attributes: 'data-back-to-goals' })}
           <section class="header-island header-island--work" aria-labelledby="work-step-title">
             <div class="header-island__copy">
               <h1 id="work-step-title" tabindex="-1">Определим точку старта</h1>
@@ -933,9 +1002,9 @@ function workExperienceTemplate() {
         ${privacyNote()}
 
         <div class="work-step__layout">
-          <form class="work-form" data-goal-form ${hasSecondStep ? '' : 'data-goal-form-final'} novalidate>
+          <form class="work-form" data-onboarding-step="work" novalidate>
             <div class="work-form__heading">
-              <span>Шаг 1 из ${hasSecondStep ? '2' : '1'}</span>
+              <span>Шаг 1 из ${editing ? '2' : '3'}</span>
               <h2>Расскажи о своей работе</h2>
             </div>
             <div class="work-form__fields">
@@ -945,7 +1014,7 @@ function workExperienceTemplate() {
               ${fieldControl({ id: 'grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.grade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
               ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.salary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
-            ${controlButton({ className: 'work-form__submit flat-button flat-button--primary', content: hasSecondStep ? 'Продолжить' : 'Отправить', type: 'submit' })}
+            ${controlButton({ className: 'work-form__submit flat-button flat-button--primary', content: 'Продолжить', type: 'submit' })}
           </form>
 
         </div>
@@ -954,10 +1023,10 @@ function workExperienceTemplate() {
     </div>`
 }
 
-function journeyHeader() {
+function journeyHeader({ backAttributes = 'data-back-to-goals' } = {}) {
   return `
     <div class="work-step__header">
-      ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>К выбору цели</span>`, attributes: 'data-back-to-goals' })}
+      ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>${isEditingOnboarding() ? 'К целям' : 'Назад'}</span>`, attributes: backAttributes })}
       <section class="header-island header-island--work" aria-labelledby="work-step-title">
         <div class="header-island__copy">
           <h1 id="work-step-title" tabindex="-1">Определим точку старта</h1>
@@ -994,21 +1063,21 @@ function jobExpectationsTemplate() {
         ${privacyNote()}
 
         <div class="work-step__layout">
-          <form class="work-form work-form--expectations" data-goal-form data-goal-form-final novalidate>
+          <form class="work-form work-form--expectations" data-onboarding-step="expectations" novalidate>
             <div class="work-form__heading">
-              <span>Шаг 2 из 2</span>
+              <span>Шаг 2 из ${isEditingOnboarding() ? '2' : '3'}</span>
               <h2>Расскажи об ожиданиях от работы</h2>
             </div>
             <div class="work-form__fields">
-              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
-              ${fieldControl({ id: 'desired-company', label: 'Компания*', placeholder: 'Название компании', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
-              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: values.desiredSpecialty || '', inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери специальность' })}
+              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не знаю</span>' })}
+              ${fieldControl({ id: 'desired-company', label: 'В каких компаниях хочешь работать*', placeholder: 'Названия компаний', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи хотя бы одну компанию' })}
+              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: values.desiredSpecialty || [], multiple: true, inputAttributes: fieldsDisabled, options: ['Разработка', 'Аналитика', 'Дизайн', 'Управление продуктом'], errorMessage: 'Выбери хотя бы одну специальность' })}
               ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.desiredGrade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
               ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.desiredSalary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
             </div>
             <div class="work-form__actions">
               ${controlButton({ className: 'flat-button flat-button--outline', content: 'Назад', attributes: 'data-back-to-work' })}
-              ${controlButton({ className: 'flat-button flat-button--primary', content: 'Отправить', type: 'submit' })}
+              ${controlButton({ className: 'flat-button flat-button--primary', content: isEditingOnboarding() ? 'Сохранить' : 'Продолжить', type: 'submit' })}
             </div>
           </form>
 
@@ -1204,7 +1273,7 @@ function catalogTemplate() {
           ${filterControl('requisites', 'Реквизиты', [{ value: 'with', label: 'Есть реквизиты' }, { value: 'without', label: 'Без реквизитов' }], catalogRequisites)}
           ${filterControl('status', 'Статус', [{ value: 'planned', label: 'В плане' }, { value: 'available', label: 'Не в плане' }, { value: 'completed', label: 'Завершен' }], catalogStatuses)}
           ${catalogSearch || catalogDirections.size || catalogSemesters.size || catalogCategories.size || catalogWorkloads.size || catalogRequisites.size || catalogStatuses.size
-            ? controlButton({ className: 'catalog__reset', content: 'Сбросить', attributes: 'data-catalog-reset' })
+            ? controlButton({ variant: 'flat', className: 'catalog__reset', content: 'Сбросить', attributes: 'data-catalog-reset' })
             : ''}
         </div>
       </div>
@@ -1281,7 +1350,7 @@ function plannerCourseTemplate(item, semester, index) {
           ${semesterCompleted
             ? '<span class="planner-course__fixed">Завершен</span>'
             : !item.fixed
-              ? controlButton({ className: 'flat-button planner-course__remove', content: `${icon('trash.svg', 18)}<span>Удалить</span>`, attributes: `data-planner-remove data-course-id="${course.id}" data-semester="${semester}"` })
+              ? controlButton({ variant: 'flat-destructive', className: 'planner-course__remove', content: `${icon('trash.svg', 18)}<span>Удалить</span>`, attributes: `data-planner-remove data-course-id="${course.id}" data-semester="${semester}"` })
               : '<span class="planner-course__fixed">Обязательный</span>'}
         </div>
       </div>
@@ -1327,7 +1396,7 @@ function plannerCourseGroupTemplate({ semester, type, title, items = [], complet
       <header class="planner-course-group__header">
         <strong id="${groupId}-title">${title}</strong>
         <div class="planner-course-group__actions">
-          ${reset ? controlButton({ className: 'flat-button planner-reset-button', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
+          ${reset ? controlButton({ variant: 'flat-destructive', className: 'planner-reset-button', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
           ${controlButton({ className: 'planner-course-group__toggle', content: icon('chevron-down.svg', 18), attributes: `aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${title.toLowerCase()}" aria-expanded="${expanded}" aria-controls="${groupId}-panel" data-planner-group-toggle="${type}" data-semester="${semester}"` })}
         </div>
       </header>
@@ -1369,7 +1438,7 @@ function plannerSemesterTemplate(semester) {
             </span>`,
           })}
           <div class="planner-semester__actions">
-            ${canReset ? controlButton({ className: 'flat-button planner-reset-button planner-semester__reset', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
+            ${canReset ? controlButton({ variant: 'flat-destructive', className: 'planner-reset-button planner-semester__reset', content: 'Сбросить курсы', attributes: `data-planner-reset-semester="${semester}"` }) : ''}
             ${controlButton({ className: 'planner-semester__chevron-button', attributes: `aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${semester} семестр" aria-expanded="${expanded}" aria-controls="planner-semester-panel-${semester}" data-planner-semester-toggle="${semester}"`, content: icon('chevron-down.svg', 18) })}
           </div>
         </header>
@@ -1418,7 +1487,7 @@ function plannerTemplate() {
         </div>
         <div class="planner__primary-actions">
           ${controlButton({ className: 'flat-button flat-button--outline planner-trajectory-button', content: `${icon('stars.svg', 20)}<span>Подобрать траекторию</span>`, attributes: 'data-planner-trajectory' })}
-          ${controlButton({ className: 'flat-button planner-reset-all', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
+          ${controlButton({ variant: 'flat-destructive', className: 'planner-reset-all', content: 'Сбросить курсы', attributes: 'data-planner-reset-all' })}
         </div>
       </div>
       <div class="planner-semesters">
@@ -1447,15 +1516,14 @@ function studyGoalTemplate() {
           <div class="study-tabs" role="tablist" aria-label="Разделы учебной цели" data-study-tabs>
             <span class="study-tabs__indicator" aria-hidden="true"></span>
             ${[
-              ['goal', 'Моя цель'],
               ['planner', 'Планировщик'],
               ['catalog', 'Каталог курсов'],
               ['glossary', 'Глоссарий'],
-            ].map(([id, label]) => tabControl({ id, label, active: id === 'goal' })).join('')}
+            ].map(([id, label]) => tabControl({ id, label, active: id === 'planner' })).join('')}
           </div>
         </section>
 
-        <div id="study-panel-goal" role="tabpanel" aria-labelledby="study-tab-goal" data-study-panel="goal">
+        <div id="study-panel-goal" role="tabpanel" aria-label="Моя цель" data-study-panel="goal" hidden>
           <section class="study-content-panel study-goal-panel" aria-labelledby="study-goal-heading">
             <h2 class="visually-hidden" id="study-goal-heading">Моя цель</h2>
             <div class="study-goal-shell">
@@ -1485,7 +1553,7 @@ function studyGoalTemplate() {
             </div>
           </section>
         </div>
-        <div id="study-panel-planner" role="tabpanel" aria-labelledby="study-tab-planner" data-study-panel="planner" hidden>
+        <div id="study-panel-planner" role="tabpanel" aria-labelledby="study-tab-planner" data-study-panel="planner">
           ${plannerTemplate()}
         </div>
         <div id="study-panel-catalog" role="tabpanel" aria-labelledby="study-tab-catalog" data-study-panel="catalog" hidden>
@@ -1737,7 +1805,6 @@ function vacanciesTemplate() {
         }).join('')}</div></div>`).join('')}
         ${fieldControl({ id: 'vacancy-salary', label: 'Зарплата от', placeholder: 'Не важна', options: CAREER_SALARY_OPTIONS, required: false })}
         ${checkboxControl({ className: 'vacancy-internships', inputAttributes: `data-vacancy-internships ${vacancyInternships ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span><strong>Рассматриваю стажировки</strong><small>Интересные проекты с возможностью остаться в штате компании</small></span>' })}
-        ${controlButton({ className: 'flat-button flat-button--primary vacancy-filters__show', content: `Показать ${filtered.length} ${filtered.length === 1 ? 'предложение' : 'предложений'}`, attributes: 'data-vacancy-show' })}
         ${controlButton({ className: 'vacancy-filters__reset', content: 'Сбросить', attributes: 'data-vacancy-reset' })}
       </aside>
     </div>`
@@ -1787,7 +1854,7 @@ function applicationsTemplate() {
           ${applicationFilterControl('position', 'Должность', filterValues.position)}
           ${applicationFilterControl('salary', 'Зарплата', filterValues.salary)}
         </div>
-        ${hasFilters ? controlButton({ className: 'applications-filter-reset', content: `${icon('application-filter-reset.svg', 18)}<span>Сбросить</span>`, attributes: 'data-application-filter-reset' }) : ''}
+        ${hasFilters ? controlButton({ variant: 'flat', className: 'applications-filter-reset', content: `${icon('application-filter-reset.svg', 18)}<span>Сбросить</span>`, attributes: 'data-application-filter-reset' }) : ''}
       </div>
       ${controlButton({ className: 'applications-add', content: `${icon('planner-plus.svg', 20)}<span>Внешний отклик</span>`, attributes: 'data-application-add' })}
     </div>
@@ -1895,7 +1962,7 @@ function portfolioProfileCard(profile, index, profiles) {
       <footer class="portfolio-profile-card__footer">
         ${profiles.length > 1 ? toggleControl({ className: 'portfolio-profile-card__primary', inputAttributes: `data-portfolio-primary="${profile.id}" ${profile.primary ? 'checked' : ''}`, label: 'Основной профиль' }) : ''}
         <div class="portfolio-profile-card__actions">
-          ${controlButton({ className: 'flat-button portfolio-profile-card__delete', content: 'Удалить', attributes: `data-portfolio-delete="${profile.id}"` })}
+          ${controlButton({ variant: 'flat-destructive', className: 'portfolio-profile-card__delete', content: 'Удалить', attributes: `data-portfolio-delete="${profile.id}"` })}
           ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать', attributes: `data-portfolio-edit="${profile.id}"` })}
         </div>
       </footer>
@@ -2075,8 +2142,8 @@ function goalDetailActions(kind) {
   if (!goal) return ''
 
   return `<div class="study-goal-shell__actions">
-    ${controlButton({ className: 'flat-button study-goal-shell__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
-    ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать', attributes: `data-edit-current-goal="${goal.id}"` })}
+    ${controlButton({ variant: 'flat-destructive', className: 'study-goal-shell__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
+    ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать данные', attributes: `data-edit-current-goal="${goal.id}"` })}
   </div>`
 }
 
@@ -2091,7 +2158,7 @@ function openGoalDeleteDialog(goal) {
         ${controlButton({ className: 'goal-dialog__close', content: icon('close.svg', 20), attributes: 'aria-label="Закрыть" data-close-dialog' })}
         <div class="goal-dialog__header">
           <h2 id="goal-delete-title">Удалить цель?</h2>
-          <p class="goal-dialog__lead" id="goal-delete-description">Цель «${escapeHTML(title)}» и&nbsp;прогресс по&nbsp;её этапам будут удалены.</p>
+          <p class="goal-dialog__lead" id="goal-delete-description">Цель «${escapeHTML(title)}» и прогресс по ее этапам будут удалены.</p>
         </div>
         <div class="goal-dialog__actions">
           ${controlButton({ className: 'flat-button flat-button--neutral', content: 'Отмена', attributes: 'data-close-dialog' })}
@@ -2192,7 +2259,10 @@ function savedGoalCard(goal) {
           <h3>${track}</h3>
           <span class="badge badge--positive">${icon('check-verified.svg', 16)}${summary.completedStages} из ${stageCount} завершено</span>
         </div>
-        ${controlButton({ className: 'flat-button flat-button--neutral saved-goal__open', content: 'Открыть', attributes: `data-open-saved-goal="${goal.kind}"` })}
+        <div class="saved-goal__actions">
+          ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
+          ${controlButton({ className: 'flat-button flat-button--neutral saved-goal__open', content: 'Открыть', attributes: `data-open-saved-goal="${goal.kind}"` })}
+        </div>
       </header>
       <div class="saved-goal__body">
         <h4>${title}</h4>
@@ -2205,6 +2275,7 @@ function savedGoalCard(goal) {
 }
 
 function myGoalsTemplate() {
+  if (!getSavedGoals().length) return invitationTemplate()
   const savedGoals = getSavedGoals()
 
   return `
@@ -2239,7 +2310,8 @@ let pageTransitioning = false
 let requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
 
 const screenRoutes = {
-  goals: { template: appTemplate, focus: '#goals-heading' },
+  goals: { template: invitationTemplate, focus: '#invitation-title' },
+  'goal-selection': { template: appTemplate, focus: '#goals-heading' },
   'work-experience': { template: workExperienceTemplate, focus: '#work-step-title' },
   'job-expectations': { template: jobExpectationsTemplate, focus: '#work-step-title' },
   success: { template: surveyCompleteTemplate, focus: '#survey-complete-title' },
@@ -2256,7 +2328,6 @@ function getScreenFromLocation() {
   const view = new URLSearchParams(window.location.search).get('view')
   if (screen === 'study-goal' && view === 'industry') return 'industry-goal'
   if (screen === 'study-goal' && view === 'vacancy') return 'vacancy'
-  if (screen === 'job-expectations' && !pendingGoalHasJobExpectationsStep()) return 'work-experience'
   return screenRoutes[screen] ? screen : 'goals'
 }
 
@@ -2266,6 +2337,7 @@ function getScreenUrl(screen) {
   if (screen === 'industry-goal') return `${appRootPath}study-goal/?view=industry`
   if (screen === 'vacancy' && selectedVacancyId) return `${appRootPath}study-goal/?view=vacancy&id=${encodeURIComponent(selectedVacancyId)}`
   if (screen === 'profile' && editingPortfolioProfileId) return `${appRootPath}profile/?id=${encodeURIComponent(editingPortfolioProfileId)}`
+  if (['work-experience', 'job-expectations'].includes(screen) && isEditingOnboarding()) return `${appRootPath}${screen}/?edit=onboarding`
   return `${appRootPath}${screen}/`
 }
 
@@ -2291,11 +2363,26 @@ function initializeCurrentScreen() {
   if (tablist) syncStudyTabIndicator(tablist, { animate: false })
 }
 
+function resolveJourneyScreen(screen) {
+  const onboarding = getOnboarding()
+  const hasGoals = getSavedGoals().length > 0
+  if (screen === 'goals' && hasGoals) return 'my-goals'
+  if (screen === 'my-goals' && !hasGoals) return 'goals'
+  if (['work-experience', 'job-expectations'].includes(screen) && onboarding.completed && !isEditingOnboarding()) return hasGoals ? 'my-goals' : 'goal-selection'
+  if (screen === 'job-expectations' && !onboarding.workReady) return 'work-experience'
+  if (screen === 'goal-selection' && !onboarding.ready) return onboarding.workReady ? 'job-expectations' : 'work-experience'
+  if (screen === 'goal-selection' && getSavedGoals().length >= MAX_GOALS) return 'my-goals'
+  if (screen === 'study-goal' && !getSavedGoals().some((goal) => goal.kind === 'study')) return hasGoals ? 'my-goals' : 'goals'
+  if (screen === 'industry-goal' && !getSavedGoals().some((goal) => goal.kind === 'industry')) return hasGoals ? 'my-goals' : 'goals'
+  return screenRoutes[screen] ? screen : 'goals'
+}
+
 function renderScreen(screen, { animate = true, historyMode = 'push' } = {}) {
   if (animate && pageTransitioning) return
 
-  const route = screenRoutes[screen] || screenRoutes.goals
-  const resolvedScreen = screenRoutes[screen] ? screen : 'goals'
+  const resolvedScreen = resolveJourneyScreen(screen)
+  const route = screenRoutes[resolvedScreen]
+  if (historyMode === 'none' && resolvedScreen !== screen) historyMode = 'replace'
 
   if (historyMode === 'push') window.history.pushState({ screen: resolvedScreen }, '', getScreenUrl(resolvedScreen))
   if (historyMode === 'replace') window.history.replaceState({ screen: resolvedScreen }, '', getScreenUrl(resolvedScreen))
@@ -2754,7 +2841,7 @@ function updateIndustryProgress() {
 
 function restartScenario() {
   try {
-    ;[SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PORTFOLIO_PROFILES_STORAGE_KEY, GOAL_FORM_VALUES_KEY, PLANNER_STORAGE_KEY]
+    ;[ONBOARDING_KEY, GOAL_SELECTION_KEY, SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PORTFOLIO_PROFILES_STORAGE_KEY, GOAL_FORM_VALUES_KEY, PLANNER_STORAGE_KEY]
       .forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // The scenario still restarts in memory when storage is unavailable.
@@ -2968,17 +3055,23 @@ root.addEventListener('click', (event) => {
     const field = selectOption.closest('[data-ui-select]')
     const select = field.querySelector('select')
     const trigger = field.querySelector('[data-ui-select-toggle]')
-    select.value = selectOption.dataset.value
-    trigger.querySelector('span:first-child').textContent = selectOption.textContent
-    trigger.querySelector('span:first-child').classList.remove('is-placeholder')
+    if (select.disabled) return
+    if (select.multiple) {
+      const option = [...select.options].find((item) => item.value === selectOption.dataset.value)
+      option.selected = !option.selected
+    } else select.value = selectOption.dataset.value
+    const selectedValues = new Set([...select.selectedOptions].map((option) => option.value))
+    const displayValue = [...select.selectedOptions].map((option) => option.textContent).join(', ')
+    trigger.querySelector('span:first-child').textContent = displayValue || trigger.dataset.placeholder
+    trigger.querySelector('span:first-child').classList.toggle('is-placeholder', !displayValue)
     field.querySelectorAll('[data-ui-select-option]').forEach((option) => {
-      const selected = option === selectOption
+      const selected = selectedValues.has(option.dataset.value)
       option.classList.toggle('is-selected', selected)
       option.setAttribute('aria-selected', String(selected))
     })
-    closeSingleSelect(field)
+    if (!select.multiple) closeSingleSelect(field)
     select.dispatchEvent(new Event('change', { bubbles: true }))
-    trigger.focus()
+    if (!select.multiple) trigger.focus()
     return
   }
 
@@ -2990,30 +3083,47 @@ root.addEventListener('click', (event) => {
     mobileMenuToggle.setAttribute('aria-expanded', String(active))
   }
 
+  if (event.target.closest('[data-start-onboarding]')) {
+    renderScreen(getOnboarding().completed ? 'goal-selection' : 'work-experience')
+    return
+  }
+
+  if (event.target.closest('[data-edit-onboarding], [data-edit-current-goal]')) {
+    window.history.pushState({}, '', `${appRootPath}work-experience/?edit=onboarding`)
+    renderScreen('work-experience', { historyMode: 'none' })
+    return
+  }
+
   const card = event.target.closest('.goal-card:not(:disabled)')
   if (card) {
-    const goal = goals.find((item) => item.id === card.dataset.goalId)
-    if (SHOW_GOAL_INFO_DIALOG) openDialog(goal)
-    else {
-      setPendingGoal(goal)
-      renderScreen('work-experience')
-    }
+    const selected = getGoalSelection()
+    const id = card.dataset.goalId
+    window.localStorage.setItem(GOAL_SELECTION_KEY, JSON.stringify(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]))
+    root.querySelectorAll('.goal-card').forEach((item) => {
+      const goal = goals.find((entry) => entry.id === item.dataset.goalId)
+      item.outerHTML = goalCard(goal)
+    })
+    root.querySelector('[data-confirm-goal-selection]').disabled = !getGoalSelection().length
+    root.querySelector(`[data-goal-id="${id}"]`)?.focus()
+    return
+  }
+
+  if (event.target.closest('[data-confirm-goal-selection]')) {
+    if (commitGoalSelection()) renderScreen('my-goals')
+    return
+  }
+
+  if (event.target.closest('[data-selection-back], [data-back-to-selection]')) {
+    if (!getOnboarding().goalsChosen) {
+      window.history.pushState({}, '', `${appRootPath}job-expectations/?edit=onboarding`)
+      renderScreen('job-expectations', { historyMode: 'none' })
+    } else renderScreen(getSavedGoals().length ? 'my-goals' : 'goals')
     return
   }
 
   const savedGoalButton = event.target.closest('[data-open-saved-goal]')
   if (savedGoalButton?.dataset.openSavedGoal === 'study') renderScreen('study-goal')
   if (savedGoalButton?.dataset.openSavedGoal === 'industry') renderScreen('industry-goal')
-
-  const editCurrentGoal = event.target.closest('[data-edit-current-goal]')
-  if (editCurrentGoal) {
-    const goal = goals.find((item) => item.id === editCurrentGoal.dataset.editCurrentGoal)
-    if (goal) {
-      setPendingGoal(goal)
-      renderScreen('work-experience')
-    }
-    return
-  }
 
   const deleteCurrentGoal = event.target.closest('[data-delete-current-goal]')
   if (deleteCurrentGoal) {
@@ -3027,19 +3137,21 @@ root.addEventListener('click', (event) => {
     const goal = goals.find((item) => item.id === confirmGoalDelete.dataset.deleteCurrentGoalConfirm)
     if (!goal) return
     try {
+      saveOnboarding(getOnboarding())
       const remaining = getSavedGoalIds().filter((id) => id !== goal.id)
       window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify(remaining))
       if (window.localStorage.getItem(PENDING_GOAL_KEY) === goal.id) window.localStorage.removeItem(PENDING_GOAL_KEY)
       window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : INDUSTRY_PROGRESS_KEY)
-      const savedValues = JSON.parse(window.localStorage.getItem(GOAL_FORM_VALUES_KEY) || '{}')
-      if (savedValues && typeof savedValues === 'object') {
-        delete savedValues[goal.id]
-        window.localStorage.setItem(GOAL_FORM_VALUES_KEY, JSON.stringify(savedValues))
+      window.localStorage.removeItem(GOAL_SELECTION_KEY)
+      if (goal.kind === 'study') {
+        window.localStorage.removeItem(PLANNER_STORAGE_KEY)
+        plannerState = createDefaultPlannerState()
       }
+      if (!remaining.length) resetGoalJourney()
     } catch {
       // Keep navigation available even when storage is unavailable.
     }
-    closeDialog(() => renderScreen('my-goals'))
+    closeDialog(() => renderScreen(getSavedGoals().length ? 'my-goals' : 'goals'))
     return
   }
 
@@ -3426,7 +3538,7 @@ root.addEventListener('click', (event) => {
   }
 
   if (event.target.closest('[data-back-to-goals]')) {
-    renderScreen('goals')
+    renderScreen(getOnboarding().completed ? 'my-goals' : 'goals')
   }
 
   if (event.target.closest('[data-back-to-work]')) {
@@ -3453,7 +3565,10 @@ root.addEventListener('click', (event) => {
 
   if (event.target.closest('[data-add-goal]')) {
     if (getSavedGoals().length >= MAX_GOALS) openGoalLimitDialog()
-    else renderScreen('goals')
+    else {
+      window.localStorage.removeItem(GOAL_SELECTION_KEY)
+      renderScreen(getOnboarding().completed ? 'goal-selection' : 'work-experience')
+    }
   }
 
   if (event.target.closest('[data-close-dialog], .goal-dialog__close')) closeDialog()
@@ -3572,6 +3687,7 @@ root.addEventListener('change', (event) => {
   }
 
   if (event.target.matches('[data-no-expectations]')) {
+    closeAllSingleSelects()
     root.querySelectorAll('[data-ui-field]').forEach((field) => {
       field.disabled = event.target.checked
       field.closest('[data-ui-select]')?.querySelector('[data-ui-select-toggle]')?.toggleAttribute('disabled', event.target.checked)
@@ -3633,6 +3749,13 @@ function validateWorkField(field) {
   if (valid) field.removeAttribute('aria-describedby')
   else field.setAttribute('aria-describedby', `${field.id}-error`)
 
+  const trigger = container.querySelector('[data-ui-select-toggle]')
+  if (trigger) {
+    trigger.setAttribute('aria-invalid', String(!valid))
+    if (valid) trigger.removeAttribute('aria-describedby')
+    else trigger.setAttribute('aria-describedby', `${field.id}-error`)
+  }
+
   return valid
 }
 
@@ -3640,6 +3763,9 @@ function clearWorkFieldValidation(field) {
   field.closest('.ui-field').classList.remove('ui-field--error')
   field.setAttribute('aria-invalid', 'false')
   field.removeAttribute('aria-describedby')
+  const trigger = field.closest('.ui-field').querySelector('[data-ui-select-toggle]')
+  trigger?.setAttribute('aria-invalid', 'false')
+  trigger?.removeAttribute('aria-describedby')
 }
 
 function focusWorkField(field) {
@@ -3796,9 +3922,10 @@ root.addEventListener('submit', (event) => {
 
   saveGoalFormValues(event.target)
 
-  if (event.target.matches('[data-goal-form-final]')) {
-    commitPendingGoal()
-    renderScreen('success')
+  if (event.target.dataset.onboardingStep === 'expectations') {
+    const editing = isEditingOnboarding()
+    saveOnboarding({ ...getOnboarding(), completed: true, ready: true })
+    renderScreen(editing && getSavedGoals().length ? 'my-goals' : 'goal-selection')
     return
   }
 
@@ -3976,6 +4103,30 @@ root.addEventListener('pointercancel', cancelPlannerPointerDrag)
 window.addEventListener('blur', cancelPlannerPointerDrag)
 
 root.addEventListener('keydown', (event) => {
+  const selectField = event.target.closest('[data-ui-select]')
+  if (selectField?.querySelector('select')?.multiple) {
+    const trigger = selectField.querySelector('[data-ui-select-toggle]')
+    const options = [...selectField.querySelectorAll('[data-ui-select-option]')]
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeSingleSelect(selectField)
+      trigger.focus()
+      return
+    }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) && !trigger.disabled) {
+      event.preventDefault()
+      selectField.classList.add('is-open')
+      trigger.setAttribute('aria-expanded', 'true')
+      selectField.querySelector('.ui-select__options').hidden = false
+      const current = options.indexOf(event.target)
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+        : event.key === 'ArrowDown' ? (current + 1) % options.length
+          : (current - 1 + options.length) % options.length
+      options[index]?.focus()
+      return
+    }
+  }
+
   const availableCourseHandle = event.target.closest('[data-planner-picker-course][data-planner-drag-handle]')
   if (availableCourseHandle && event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
     const courseId = availableCourseHandle.dataset.plannerPickerCourse
