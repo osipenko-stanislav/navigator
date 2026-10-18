@@ -1629,3 +1629,9 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .portfolio-profile-card--island .saved-goal__toggle .saved-goal__copy { padding-right: 0; }
   .portfolio-profile-card--island .saved-goal__header-actions { top: auto; right: 20px; bottom: 16px; }
 }
+
+
+.saved-goal__header-extra { margin-top: -12px; padding: 0 32px 24px; }
+@media (max-width: 600px) {
+  .saved-goal__header-extra { padding-inline: 20px; padding-bottom: 20px; }
+}

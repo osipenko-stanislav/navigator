@@ -16,6 +16,7 @@ const goals = [
 
 const MAX_GOALS = 2
 const SAVED_GOALS_KEY = 'cpk:selected-goals'
+const PRIMARY_GOAL_KEY = 'cpk:primary-goal'
 const PENDING_GOAL_KEY = 'cpk:pending-goal'
 const STUDY_PROGRESS_KEY = 'cpk:study-goal-progress'
 const INDUSTRY_PROGRESS_KEY = 'cpk:industry-goal-progress'
@@ -677,6 +678,19 @@ function getSavedGoalIds() {
   }
 }
 
+function getPrimaryGoalId() {
+  const ids = getSavedGoalIds()
+  try {
+    const saved = window.localStorage.getItem(PRIMARY_GOAL_KEY)
+    const primary = ids.includes(saved) ? saved : ids[0] || null
+    if (primary) window.localStorage.setItem(PRIMARY_GOAL_KEY, primary)
+    else window.localStorage.removeItem(PRIMARY_GOAL_KEY)
+    return primary
+  } catch {
+    return ids[0] || null
+  }
+}
+
 function getSavedGoals() {
   const ids = getSavedGoalIds()
   return ids.map((id) => goals.find((goal) => goal.id === id)).filter(Boolean)
@@ -718,6 +732,7 @@ function commitGoalSelection() {
     window.localStorage.removeItem(careerProgressKey(goals.find((goal) => goal.id === id)))
   })
   window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify([...saved, ...selected]))
+  getPrimaryGoalId()
   saveOnboarding({ ...getOnboarding(), completed: true, ready: true, goalsChosen: true })
   window.localStorage.removeItem(GOAL_SELECTION_KEY)
   window.localStorage.removeItem(PENDING_GOAL_KEY)
@@ -725,7 +740,7 @@ function commitGoalSelection() {
 }
 
 function resetGoalJourney() {
-  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, INDUSTRY_PROGRESS_KEY, 'cpk:science-goal-progress', 'cpk:business-goal-progress']
+  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, PRIMARY_GOAL_KEY, INDUSTRY_PROGRESS_KEY, 'cpk:science-goal-progress', 'cpk:business-goal-progress']
     .forEach((key) => window.localStorage.removeItem(key))
 }
 
@@ -2092,11 +2107,12 @@ function portfolioMaterialTemplate(label, linkLabel, link, file, kind, profileId
     </section>`
 }
 
-function expandableCardHeader({ title, titleId, panelId, meta = '', expanded, type, toggleAttributes, deleteAttributes, description = '', actions = '' }) {
+function expandableCardHeader({ title, titleId, panelId, meta = '', expanded, type, toggleAttributes, deleteAttributes, description = '', actions = '', extra = '' }) {
   return `<header class="saved-goal__header">
     <h3 class="saved-goal__heading">
       ${controlButton({ className: 'saved-goal__toggle', attributes: `data-island-toggle data-island-type="${type}" ${toggleAttributes} aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${type === 'profile' ? 'профиль' : 'цель'}: ${escapeHTML(title)}"`, content: `<span class="saved-goal__copy">${meta}<span class="saved-goal__title" id="${titleId}">${escapeHTML(title)}</span>${description ? `<span class="saved-goal__description">${escapeHTML(description)}</span>` : ''}</span><span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
     </h3>
+    ${extra ? `<div class="saved-goal__header-extra">${extra}</div>` : ''}
     <div class="saved-goal__header-actions">${actions}${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: deleteAttributes })}</div>
   </header>`
 }
@@ -2401,6 +2417,7 @@ function industryGoalTemplate() {
 }
 
 function savedGoalCard(goal) {
+  const primaryId = getPrimaryGoalId()
   const expanded = goal.id === getSavedGoalIds()[0]
   const progress = getIndustryProgress(goal)
   const panelId = `saved-goal-panel-${goal.id}`
@@ -2408,6 +2425,7 @@ function savedGoalCard(goal) {
     ${expandableCardHeader({
       title: goal.title, titleId: `saved-goal-title-${goal.id}`, panelId, expanded, type: 'goal',
       meta: `<span class="goal-card__heading"><span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(iconByKind[goal.kind], 18, 'icon goal-card__icon-default')}</span><span class="goal-card__category">${goal.category}</span></span>`,
+      extra: getSavedGoalIds().length > 1 ? toggleControl({ className: 'saved-goal__primary', inputAttributes: `data-primary-goal="${goal.id}" ${primaryId === goal.id ? 'checked' : ''}`, label: 'Основная цель' }) : '',
       toggleAttributes: 'data-saved-goal-toggle', deleteAttributes: `data-delete-current-goal="${goal.id}"`,
     })}
     <div class="study-stage__panel saved-goal__panel" id="${panelId}" role="region" aria-labelledby="saved-goal-title-${goal.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
@@ -3267,7 +3285,7 @@ function updateIndustryProgress() {
 
 function restartScenario() {
   try {
-    ;[ONBOARDING_KEY, GOAL_SELECTION_KEY, SAVED_GOALS_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PORTFOLIO_PROFILES_STORAGE_KEY, GOAL_FORM_VALUES_KEY, PLANNER_STORAGE_KEY]
+    ;[ONBOARDING_KEY, GOAL_SELECTION_KEY, SAVED_GOALS_KEY, PRIMARY_GOAL_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, VACANCY_STATE_KEY, APPLICATIONS_STORAGE_KEY, PORTFOLIO_PROFILES_STORAGE_KEY, GOAL_FORM_VALUES_KEY, PLANNER_STORAGE_KEY]
       .forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // The scenario still restarts in memory when storage is unavailable.
@@ -3655,6 +3673,7 @@ root.addEventListener('click', (event) => {
       saveOnboarding(getOnboarding())
       const remaining = getSavedGoalIds().filter((id) => id !== goal.id)
       window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify(remaining))
+      getPrimaryGoalId()
       if (window.localStorage.getItem(PENDING_GOAL_KEY) === goal.id) window.localStorage.removeItem(PENDING_GOAL_KEY)
       window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : careerProgressKey(goal))
       window.localStorage.removeItem(GOAL_SELECTION_KEY)
@@ -4100,6 +4119,15 @@ document.addEventListener('click', (event) => {
 })
 
 root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-primary-goal]')) {
+    const ids = getSavedGoalIds()
+    const goalId = event.target.dataset.primaryGoal
+    const primary = event.target.checked ? goalId : ids.find((id) => id !== goalId) || goalId
+    window.localStorage.setItem(PRIMARY_GOAL_KEY, primary)
+    root.querySelectorAll('[data-primary-goal]').forEach((field) => { field.checked = field.dataset.primaryGoal === primary })
+    return
+  }
+
   if (event.target.matches('[data-saved-goal-task]')) {
     const card = event.target.closest('[data-saved-goal]')
     const goal = goals.find((item) => item.id === card.dataset.savedGoal)
