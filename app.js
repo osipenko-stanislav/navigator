@@ -2400,14 +2400,10 @@ function savedGoalCard(goal) {
   const panelId = `saved-goal-panel-${goal.id}`
   return `<article class="saved-goal saved-goal--inline ${expanded ? 'saved-goal--expanded' : ''}" data-saved-goal="${goal.id}">
     <header class="saved-goal__header">
-      <div class="saved-goal__copy">
-        <p class="saved-goal__track">${goal.category}</p>
-        <h3 id="saved-goal-title-${goal.id}">${goal.title}</h3>
-      </div>
-      <div class="saved-goal__actions">
-        ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
-        ${controlButton({ variant: 'flat-icon', className: 'saved-goal__toggle', attributes: `data-saved-goal-toggle aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} цель: ${escapeHTML(goal.title)}"`, content: `<span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
-      </div>
+      <h3 class="saved-goal__heading">
+        ${controlButton({ className: 'saved-goal__toggle', attributes: `data-saved-goal-toggle aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} цель: ${escapeHTML(goal.title)}"`, content: `<span class="saved-goal__copy"><span class="saved-goal__track">${goal.category}</span><span class="saved-goal__title" id="saved-goal-title-${goal.id}">${goal.title}</span></span><span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
+      </h3>
+      ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
     </header>
     <div class="study-stage__panel saved-goal__panel" id="${panelId}" role="region" aria-labelledby="saved-goal-title-${goal.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
       <div class="study-stage__panel-inner">
