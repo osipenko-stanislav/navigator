@@ -1015,7 +1015,7 @@ function invitationTemplate() {
               ['portfolio', 'Профиль'],
               ['vacancies', 'Вакансии'],
               ['applications', 'Отклики'],
-              ['planner', 'Планировщик'],
+              ['planner', 'Учебный план'],
             ].map(([id, label]) => tabControl({ id, label, active: id === 'about' })).join('')}
           </div>
         </section>
@@ -1501,7 +1501,7 @@ function glossaryTemplate() {
     <section class="study-content-panel glossary" aria-labelledby="glossary-title">
       <div class="glossary__intro">
         <h2 id="glossary-title">Глоссарий</h2>
-        <p>Основные термины учебной программы, которые встречаются в каталоге и планировщике.</p>
+        <p>Основные термины учебной программы, которые встречаются в каталоге и учебном плане.</p>
       </div>
       <div class="glossary-list">${glossaryTerms.map(glossaryTermTemplate).join('')}</div>
     </section>`
@@ -1640,7 +1640,7 @@ function plannerTemplate() {
   const semesterProgress = getStudySemesterProgress()
   return `
     <section class="planner" aria-labelledby="planner-title">
-      <h2 class="visually-hidden" id="planner-title">Планировщик</h2>
+      <h2 class="visually-hidden" id="planner-title">Учебный план</h2>
       <p class="visually-hidden" id="planner-drag-instructions">Перетащи курс за основную область карточки в другой семестр. Для доступного курса перетаскивание добавит его в семестр. С клавиатуры используй Alt и клавиши со стрелками.</p>
       <section class="planner-statistics ${statisticsExpanded ? 'planner-statistics--expanded' : ''}" aria-labelledby="planner-statistics-title">
         <header class="planner-statistics__header"><h3 id="planner-statistics-title">${controlButton({ className: 'planner-statistics__toggle', content: `<span>Статистика</span>${icon('chevron-down.svg', 18)}`, attributes: `data-planner-statistics-toggle aria-expanded="${statisticsExpanded}" aria-controls="planner-statistics-panel"` })}</h3></header>
@@ -1692,7 +1692,7 @@ function studyGoalTemplate() {
           <div class="study-tabs" role="tablist" aria-label="Разделы учебной цели" data-study-tabs>
             <span class="study-tabs__indicator" aria-hidden="true"></span>
             ${[
-              ['planner', 'Планировщик'],
+              ['planner', 'Учебный план'],
               ['catalog', 'Каталог курсов'],
               ['glossary', 'Глоссарий'],
             ].map(([id, label]) => tabControl({ id, label, active: id === 'planner' })).join('')}
