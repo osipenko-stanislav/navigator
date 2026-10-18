@@ -1477,13 +1477,13 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 
 /* Navigator home: full-width informational landing within the shared page layout. */
 .navigator-landing { display: flex; flex-direction: column; gap: 4px; }
-.navigator-landing h1, .navigator-landing h2, .navigator-landing h3, .navigator-landing p { margin: 0; }
+.navigator-landing__hero :is(h1, h2, p), .navigator-landing__about :is(h2, h3, p), .navigator-goals-panel__header h2 { margin: 0; }
 .navigator-landing__hero, .navigator-landing__help, .navigator-landing__goals { border-radius: var(--radius-xl); background: var(--surface); }
 .navigator-landing__hero { position: relative; display: flex; align-items: center; min-height: 360px; padding: 40px; overflow: hidden; }
 .navigator-landing__intro { position: relative; z-index: 1; width: 60%; }
 .navigator-landing__intro h1 { margin-bottom: 8px; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -.5px; }
 .navigator-landing__intro .navigator-landing__lead { margin-bottom: 8px; font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
-.navigator-landing p, .navigator-landing li, .navigator-landing h3 { font-size: 14px; line-height: 20px; }
+.navigator-landing__hero p, .navigator-landing__about :is(p, li, h3) { font-size: 14px; line-height: 20px; }
 .navigator-landing__intro p { max-width: 470px; color: var(--text-secondary); text-wrap: pretty; }
 .navigator-landing__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 24px; }
 .navigator-landing__actions .flat-button { min-height: 40px; }
@@ -1524,4 +1524,26 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .navigator-landing__hero, .navigator-landing__help, .navigator-landing__goals { padding-inline: 20px; }
   .navigator-landing__actions { align-items: stretch; flex-direction: column; }
   .navigator-landing__actions .flat-button { width: 100%; }
+}
+
+
+/* Shared navigator tabs retain the landing introduction across all sections. */
+.navigator-landing__hero { display: flex; min-height: 304px; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 32px; padding: 32px 32px 24px; }
+.navigator-landing__art { top: 8px; right: 8px; width: 300px; height: 232px; transform: none; }
+.navigator-landing__tabs { flex-shrink: 0; }
+.navigator-landing__about { display: flex; flex-direction: column; gap: 4px; }
+.navigator-landing > [data-study-panel] { min-width: 0; }
+.navigator-landing > [data-study-panel][hidden] { display: none; }
+.navigator-goals-panel { padding: 24px 32px 32px; border-radius: var(--radius-xl); background: var(--surface); }
+.navigator-goals-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.navigator-goals-panel__header h2 { font-size: 20px; line-height: 28px; font-weight: 600; }
+.navigator-goals-panel__header .flat-button { display: flex; align-items: center; gap: 4px; }
+@media (max-width: 700px) {
+  .navigator-landing__hero { min-height: 0; gap: 24px; padding: 28px 24px 20px; }
+  .navigator-landing__art { top: -4px; right: -12px; width: 126px; height: auto; }
+  .navigator-goals-panel { padding: 24px; }
+}
+@media (max-width: 420px) {
+  .navigator-landing__hero { padding-inline: 20px; }
+  .navigator-goals-panel { padding: 24px 20px; }
 }

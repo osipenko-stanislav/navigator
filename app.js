@@ -974,6 +974,27 @@ function infoPanel() {
     </aside>`
 }
 
+function navigatorGoalsTemplate() {
+  const savedGoals = getSavedGoals()
+  return `<section class="navigator-goals-panel" aria-labelledby="my-goals-title">
+    <div class="navigator-goals-panel__header">
+      <h2 id="my-goals-title" tabindex="-1">Мои цели</h2>
+      ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Цель</span>`, attributes: 'data-add-goal' })}
+    </div>
+    <div class="saved-goals-list">
+      ${savedGoals.length ? savedGoals.map(savedGoalCard).join('') : `
+        <div class="my-goals-empty">
+          <p>Здесь появятся твои цели</p>
+          ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Добавить цель</span>`, attributes: 'data-add-goal' })}
+        </div>`}
+    </div>
+  </section>`
+}
+
+function isNavigatorContext() {
+  return getScreenFromLocation() === 'goals' || new URLSearchParams(window.location.search).get('from') === 'navigator'
+}
+
 function invitationTemplate() {
   return `
     <div class="app-shell">
@@ -984,14 +1005,22 @@ function invitationTemplate() {
             <h1 id="invitation-title" tabindex="-1">Навигатор</h1>
             <h2 class="navigator-landing__lead">Планируй карьеру и учебу в одном месте</h2>
             <p>Здесь можно поставить карьерную цель, откликаться на партнерские вакансии, вести трекер откликов и подбирать нужные курсы.</p>
-            <div class="navigator-landing__actions">
-              ${controlButton({ className: 'flat-button flat-button--primary', content: 'Заняться карьерой' })}
-              ${controlButton({ variant: 'flat-outline', content: 'Подобрать учебный план' })}
-            </div>
           </div>
           <img class="navigator-landing__art" src="${ASSET}goals-header-illustration.svg" width="389" height="300" alt="" aria-hidden="true">
+          <div class="study-tabs navigator-landing__tabs" role="tablist" aria-label="Разделы навигатора" data-study-tabs data-navigator-tabs>
+            <span class="study-tabs__indicator" aria-hidden="true"></span>
+            ${[
+              ['about', 'О проекте'],
+              ['goals', 'Мои цели'],
+              ['portfolio', 'Профиль'],
+              ['vacancies', 'Вакансии'],
+              ['applications', 'Отклики'],
+              ['planner', 'Планировщик'],
+            ].map(([id, label]) => tabControl({ id, label, active: id === 'about' })).join('')}
+          </div>
         </section>
 
+        <div class="navigator-landing__about" id="study-panel-about" role="tabpanel" aria-labelledby="study-tab-about" data-study-panel="about">
         <section class="navigator-landing__help" aria-labelledby="navigator-help-title">
           <div class="navigator-landing__help-copy">
             <h2 id="navigator-help-title">Если нужна помощь</h2>
@@ -1016,6 +1045,22 @@ function invitationTemplate() {
             <li>${icon('edit.svg', 20)}<span>Ты можешь поменять цель в любой момент</span></li>
           </ul>
         </section>
+        </div>
+        <div id="study-panel-goals" role="tabpanel" aria-labelledby="study-tab-goals" data-study-panel="goals" hidden>
+          ${navigatorGoalsTemplate()}
+        </div>
+        <div id="study-panel-portfolio" role="tabpanel" aria-labelledby="study-tab-portfolio" data-study-panel="portfolio" hidden>
+          ${portfolioTemplate()}
+        </div>
+        <div id="study-panel-vacancies" role="tabpanel" aria-labelledby="study-tab-vacancies" data-study-panel="vacancies" hidden>
+          ${vacanciesTemplate()}
+        </div>
+        <div id="study-panel-applications" role="tabpanel" aria-labelledby="study-tab-applications" data-study-panel="applications" hidden>
+          ${applicationsTemplate()}
+        </div>
+        <div id="study-panel-planner" role="tabpanel" aria-labelledby="study-tab-planner" data-study-panel="planner" hidden>
+          ${plannerTemplate()}
+        </div>
       </main>
       <div id="modal-root"></div>
     </div>`
@@ -2206,7 +2251,7 @@ function returnToPortfolio() {
   portfolioDraftFiles = { resume: undefined, portfolio: undefined }
   portfolioDraftFileObjects = { resume: null, portfolio: null }
   requestedStudyTab = 'portfolio'
-  renderScreen('industry-goal')
+  renderScreen(isNavigatorContext() ? 'goals' : 'industry-goal')
 }
 
 function setPortfolioFileError(field, message = '') {
@@ -2470,6 +2515,20 @@ function getScreenFromLocation() {
 const appRootPath = APP_ROOT_URL.pathname
 
 function getScreenUrl(screen) {
+  if (screen === 'goals' && requestedStudyTab) {
+    const url = new URL('goals/', APP_ROOT_URL)
+    url.searchParams.set('tab', requestedStudyTab)
+    return `${url.pathname}${url.search}`
+  }
+  if (['profile', 'vacancy'].includes(screen) && isNavigatorContext()) {
+    const url = new URL(screen === 'vacancy' ? 'study-goal/' : 'profile/', APP_ROOT_URL)
+    if (screen === 'vacancy') {
+      url.searchParams.set('view', 'vacancy')
+      if (selectedVacancyId) url.searchParams.set('id', selectedVacancyId)
+    } else if (editingPortfolioProfileId) url.searchParams.set('id', editingPortfolioProfileId)
+    url.searchParams.set('from', 'navigator')
+    return `${url.pathname}${url.search}`
+  }
   if (screen === 'industry-goal') {
     const url = new URL('study-goal/', APP_ROOT_URL)
     url.searchParams.set('view', 'industry')
@@ -2499,7 +2558,7 @@ function initializeCurrentScreen() {
   const tablist = root.querySelector('[data-study-tabs]')
   if (tablist && requestedStudyTab) {
     const requestedTab = tablist.querySelector(`[data-study-tab="${requestedStudyTab}"]`)
-    if (requestedTab) activateStudyTab(requestedTab)
+    if (requestedTab) activateStudyTab(requestedTab, { updateHistory: false })
     requestedStudyTab = null
   }
   if (tablist) syncStudyTabIndicator(tablist, { animate: false })
@@ -2514,7 +2573,6 @@ function initializeCurrentScreen() {
 function resolveJourneyScreen(screen) {
   const onboarding = getOnboarding()
   const hasGoals = getSavedGoals().length > 0
-  if (screen === 'my-goals' && !hasGoals) return 'goals'
   if (['work-experience', 'job-expectations'].includes(screen) && onboarding.completed && !isEditingOnboarding()) return hasGoals ? 'my-goals' : 'goal-selection'
   if (screen === 'job-expectations' && !onboarding.workReady) return 'work-experience'
   if (screen === 'goal-selection' && !onboarding.ready) return onboarding.workReady ? 'job-expectations' : 'work-experience'
@@ -2529,7 +2587,11 @@ function renderScreen(screen, { animate = true, historyMode = 'push' } = {}) {
 
   closePlannerCourseMenu()
   closePlannerAvailableFilters()
-  const resolvedScreen = resolveJourneyScreen(screen)
+  let resolvedScreen = resolveJourneyScreen(screen)
+  if (resolvedScreen === 'my-goals') {
+    requestedStudyTab = 'goals'
+    resolvedScreen = 'goals'
+  }
   const route = screenRoutes[resolvedScreen]
   if (historyMode === 'none' && resolvedScreen !== screen) historyMode = 'replace'
 
@@ -3175,7 +3237,7 @@ function resetPlanner({ semester = null, keepCompleted = true } = {}) {
   savePlannerState()
 }
 
-function activateStudyTab(tab, { focus = false } = {}) {
+function activateStudyTab(tab, { focus = false, updateHistory = true } = {}) {
   const tablist = tab.closest('[data-study-tabs]')
   closePlannerCourseMenu()
   closePlannerAvailableFilters()
@@ -3191,7 +3253,16 @@ function activateStudyTab(tab, { focus = false } = {}) {
     panel.hidden = panel.dataset.studyPanel !== target
   })
   syncStudyTabIndicator(tablist)
-  if (focus) tab.focus()
+  if (updateHistory && tablist.hasAttribute('data-navigator-tabs')) {
+    const url = new URL(window.location.href)
+    if (target === 'about') url.searchParams.delete('tab')
+    else url.searchParams.set('tab', target)
+    if (url.href !== window.location.href) window.history.pushState({ screen: 'goals' }, '', `${url.pathname}${url.search}`)
+  }
+  if (focus) {
+    tab.focus({ preventScroll: true })
+    tab.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
 }
 
 function updateStudyProgress() {
@@ -3750,7 +3821,7 @@ root.addEventListener('click', (event) => {
   if (event.target.closest('[data-vacancy-add-profile]')) {
     closeDialog(() => {
       requestedStudyTab = 'portfolio'
-      renderScreen('industry-goal')
+      renderScreen(isNavigatorContext() ? 'goals' : 'industry-goal')
     })
     return
   }
@@ -4013,7 +4084,7 @@ root.addEventListener('click', (event) => {
 
   if (event.target.closest('[data-back-to-vacancies]')) {
     requestedStudyTab = 'vacancies'
-    renderScreen('industry-goal')
+    renderScreen(isNavigatorContext() ? 'goals' : 'industry-goal')
   }
 
   if (event.target.closest('[data-back-to-portfolio]')) {
@@ -4419,7 +4490,7 @@ root.addEventListener('submit', (event) => {
 window.addEventListener('popstate', () => {
   selectedVacancyId = new URLSearchParams(window.location.search).get('id')
   editingPortfolioProfileId = new URLSearchParams(window.location.search).get('id')
-  if (getScreenFromLocation() === 'industry-goal') requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
+  if (['goals', 'industry-goal', 'study-goal'].includes(getScreenFromLocation())) requestedStudyTab = new URLSearchParams(window.location.search).get('tab') || (getScreenFromLocation() === 'goals' ? 'about' : null)
   requestedIndustryAction = new URLSearchParams(window.location.search).get('action')
   renderScreen(getScreenFromLocation(), { historyMode: 'none' })
 })
