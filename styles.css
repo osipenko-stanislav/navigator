@@ -1563,3 +1563,6 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .work-form__date-row .ui-field__control--date { gap: 4px; padding-inline: 8px; }
   .work-form__date-row :is(.ui-date__clear, .ui-date__calendar) { width: 20px; flex-basis: 20px; }
 }
+
+
+.ui-select__options, .ui-multiselect__options { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }

@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, tabControl, toggleControl } from './components/controls.js?v=25'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=26'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -2960,20 +2960,7 @@ function renderPlannerAvailableGroup(semester, { focusSelector } = {}) {
 }
 
 function positionPlannerFilterOptions(field) {
-  const options = field.querySelector('.ui-multiselect__options')
-  if (!options || options.hidden) return
-  const rect = options.getBoundingClientRect()
-  if (rect.right > window.innerWidth - 12) options.style.left = `${window.innerWidth - 12 - rect.right}px`
-  if (rect.bottom > window.innerHeight - 12) {
-    const anchor = field.getBoundingClientRect()
-    const below = window.innerHeight - anchor.bottom - 16
-    const above = anchor.top - 16
-    if (above > below) {
-      options.style.top = 'auto'
-      options.style.bottom = 'calc(100% + 4px)'
-      options.style.maxHeight = `${Math.min(280, Math.max(32, above))}px`
-    } else options.style.maxHeight = `${Math.min(280, Math.max(32, below))}px`
-  }
+  positionDropdown(field)
 }
 
 function closePlannerAvailableFilters() {
@@ -3557,6 +3544,7 @@ root.addEventListener('click', (event) => {
     field.classList.toggle('is-open', open)
     selectToggle.setAttribute('aria-expanded', String(open))
     field.querySelector('.ui-select__options').hidden = !open
+    if (open) positionDropdown(field)
     return
   }
 
@@ -4712,6 +4700,7 @@ root.addEventListener('keydown', (event) => {
       selectField.classList.add('is-open')
       trigger.setAttribute('aria-expanded', 'true')
       selectField.querySelector('.ui-select__options').hidden = false
+      positionDropdown(selectField)
       const current = options.indexOf(event.target)
       const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
         : event.key === 'ArrowDown' ? (current + 1) % options.length
@@ -4778,3 +4767,24 @@ window.addEventListener('resize', () => closePlannerCourseMenu())
 document.addEventListener('scroll', (event) => {
   if (plannerCourseMenu && !event.target.closest?.('#planner-course-menu')) closePlannerCourseMenu()
 }, true)
+
+
+let dropdownPositionFrame = 0
+function scheduleDropdownPositioning() {
+  if (dropdownPositionFrame) return
+  dropdownPositionFrame = window.requestAnimationFrame(() => {
+    dropdownPositionFrame = 0
+    root.querySelectorAll('[data-ui-select].is-open, [data-ui-multiselect].is-open').forEach(positionDropdown)
+  })
+}
+
+const dropdownPositionObserver = new MutationObserver(scheduleDropdownPositioning)
+dropdownPositionObserver.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
+window.addEventListener('resize', scheduleDropdownPositioning)
+window.visualViewport?.addEventListener('resize', scheduleDropdownPositioning)
+window.visualViewport?.addEventListener('scroll', scheduleDropdownPositioning)
+document.addEventListener('scroll', (event) => {
+  if (event.target.closest?.('.ui-select__options, .ui-multiselect__options')) return
+  scheduleDropdownPositioning()
+}, true)
+scheduleDropdownPositioning()

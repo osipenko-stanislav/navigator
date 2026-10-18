@@ -230,3 +230,60 @@ export function multiSelectControl({ id, label, placeholder, options, selected =
       </div>
     </div>`
 }
+
+
+export function positionDropdown(field) {
+  const menu = field.querySelector('.ui-select__options, .ui-multiselect__options')
+  const trigger = field.querySelector('.ui-select__trigger, .ui-multiselect__trigger')
+  if (!menu || menu.hidden || !trigger || !trigger.getClientRects().length) return
+
+  // Measure from the component's default geometry on every opening or viewport change.
+  for (const property of ['top', 'bottom', 'left', 'max-height', 'max-width']) menu.style.removeProperty(property)
+  const viewport = window.visualViewport
+  const margin = 12
+  const gap = 4
+  const bounds = {
+    top: (viewport?.offsetTop || 0) + margin,
+    bottom: (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight) - margin,
+    left: (viewport?.offsetLeft || 0) + margin,
+    right: (viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) - margin,
+  }
+
+  // Drawers and other scrolling surfaces can clip a menu before the viewport does.
+  for (let parent = menu.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+    const style = getComputedStyle(parent)
+    const rect = parent.getBoundingClientRect()
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+      bounds.top = Math.max(bounds.top, rect.top + parent.clientTop)
+      bounds.bottom = Math.min(bounds.bottom, rect.top + parent.clientTop + parent.clientHeight)
+    }
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) {
+      bounds.left = Math.max(bounds.left, rect.left + parent.clientLeft)
+      bounds.right = Math.min(bounds.right, rect.left + parent.clientLeft + parent.clientWidth)
+    }
+  }
+
+  const styles = getComputedStyle(menu)
+  const heightLimit = Number.parseFloat(styles.maxHeight) || Infinity
+  const widthLimit = Number.parseFloat(styles.maxWidth) || Infinity
+  menu.style.maxWidth = `${Math.min(widthLimit, Math.max(0, bounds.right - bounds.left))}px`
+  const anchor = trigger.getBoundingClientRect()
+  const desiredHeight = Math.min(menu.scrollHeight + menu.offsetHeight - menu.clientHeight, heightLimit)
+  const below = Math.max(0, bounds.bottom - anchor.bottom - gap)
+  const above = Math.max(0, anchor.top - bounds.top - gap)
+  const openAbove = below < desiredHeight && (above >= desiredHeight || above > below)
+  menu.style.maxHeight = `${Math.min(heightLimit, openAbove ? above : below)}px`
+  menu.dataset.dropdownPlacement = openAbove ? 'top' : 'bottom'
+
+  const parent = menu.offsetParent
+  if (!parent) return
+  const parentRect = parent.getBoundingClientRect()
+  const top = openAbove ? anchor.top - gap - menu.offsetHeight : anchor.bottom + gap
+  menu.style.top = `${top - parentRect.top - parent.clientTop + parent.scrollTop}px`
+  menu.style.bottom = 'auto'
+
+  const rect = menu.getBoundingClientRect()
+  const shift = rect.right > bounds.right ? bounds.right - rect.right
+    : rect.left < bounds.left ? bounds.left - rect.left : 0
+  if (shift) menu.style.left = `${rect.left + shift - parentRect.left - parent.clientLeft + parent.scrollLeft}px`
+}
