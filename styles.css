@@ -1491,8 +1491,8 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .navigator-landing__help { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; padding: 32px 40px; }
 .navigator-landing__help h2, .navigator-landing__goals h2 { font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
 .navigator-landing__help-copy > p { margin-top: 12px; color: var(--text-secondary); }
-.navigator-landing__mayak { align-self: center; padding-left: 32px; border-left: 1px solid #e5e5e7; }
-.navigator-landing__mayak h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 500; }
+.navigator-landing__mayak { align-self: start; }
+.navigator-landing__mayak h3 { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-weight: 500; }
 .navigator-landing__mayak > p { color: var(--text-secondary); }
 .navigator-landing__command { color: var(--text); font-weight: 500; white-space: nowrap; }
 .navigator-landing__mayak .navigator-landing__help-path { margin-top: 8px; color: var(--text); text-wrap: pretty; }
@@ -1509,7 +1509,6 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .navigator-landing__intro { width: 65%; }
   .navigator-landing__art { right: -40px; width: 39%; }
   .navigator-landing__help, .navigator-landing__goals { gap: 24px; padding: 32px; }
-  .navigator-landing__mayak { padding-left: 24px; }
 }
 @media (max-width: 700px) {
   .navigator-landing__hero { min-height: 0; padding: 28px 24px; }
@@ -1518,7 +1517,6 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .navigator-landing__art { top: -4px; right: -12px; width: 126px; transform: none; }
   .navigator-landing__desktop-break { display: none; }
   .navigator-landing__help, .navigator-landing__goals { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 28px 24px; }
-  .navigator-landing__mayak { border-left: 0; border-top: 1px solid #e5e5e7; padding: 24px 0 0; }
 }
 @media (max-width: 420px) {
   .navigator-landing__hero, .navigator-landing__help, .navigator-landing__goals { padding-inline: 20px; }
@@ -1528,8 +1526,8 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 
 
 /* Shared navigator tabs retain the landing introduction across all sections. */
-.navigator-landing__hero { display: flex; min-height: 304px; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 32px; padding: 32px 32px 24px; }
-.navigator-landing__art { top: 8px; right: 8px; width: 300px; height: 232px; transform: none; }
+.navigator-landing__hero { display: flex; min-height: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 20px; padding: 24px 32px; }
+.navigator-landing__art { top: auto; right: 0; bottom: 72px; width: 287px; height: 180px; object-fit: contain; transform: none; }
 .navigator-landing__tabs { flex-shrink: 0; }
 .navigator-landing__about { display: flex; flex-direction: column; gap: 4px; }
 .navigator-landing > [data-study-panel] { min-width: 0; }
@@ -1540,7 +1538,7 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .navigator-goals-panel__header .flat-button { display: flex; align-items: center; gap: 4px; }
 @media (max-width: 700px) {
   .navigator-landing__hero { min-height: 0; gap: 24px; padding: 28px 24px 20px; }
-  .navigator-landing__art { top: -4px; right: -12px; width: 126px; height: auto; }
+  .navigator-landing__art { top: -4px; right: -12px; bottom: auto; width: 126px; height: auto; }
   .navigator-goals-panel { padding: 24px; }
 }
 @media (max-width: 420px) {
