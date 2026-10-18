@@ -462,6 +462,7 @@ const trajectoryPresets = Object.fromEntries([
 
 function createDefaultPlannerState() {
   return {
+    schemaVersion: 2,
     hideCompletedSemesters: false,
     hideProgress: false,
     statisticsCollapsed: false,
@@ -490,7 +491,10 @@ function getPlannerState() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(PLANNER_STORAGE_KEY) || 'null')
     if (!saved?.semesters) return createDefaultPlannerState()
+    // Start the updated study plan with only past semesters filled, once per saved plan.
+    const keepUpcomingCourses = saved.schemaVersion >= 2
     return {
+      schemaVersion: 2,
       hideCompletedSemesters: Boolean(saved.hideCompletedSemesters),
       hideProgress: Boolean(saved.hideProgress),
       statisticsCollapsed: Boolean(saved.statisticsCollapsed),
@@ -505,9 +509,11 @@ function getPlannerState() {
         : [],
       semesters: Object.fromEntries(Array.from({ length: 8 }, (_, index) => {
         const semester = index + 1
-        const courses = Array.isArray(saved.semesters[semester]) ? saved.semesters[semester] : []
-        const resolvedCourses = semester === 2 && courses.length === 0
-          ? createDefaultPlannerState().semesters[2]
+        const courses = semester >= CURRENT_SEMESTER && !keepUpcomingCourses
+          ? []
+          : Array.isArray(saved.semesters[semester]) ? saved.semesters[semester] : []
+        const resolvedCourses = semester < CURRENT_SEMESTER && courses.length === 0
+          ? createDefaultPlannerState().semesters[semester]
           : courses
         return [semester, resolvedCourses
           .filter((item) => plannerCourses.some((course) => course.id === item.id))
@@ -520,6 +526,7 @@ function getPlannerState() {
 }
 
 let plannerState = getPlannerState()
+savePlannerState()
 let pointerPlannerDrag = null
 let suppressPlannerCourseClickUntil = 0
 let catalogSearch = ''
