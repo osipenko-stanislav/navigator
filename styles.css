@@ -1607,3 +1607,15 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .saved-goal__toggle { padding: 20px; }
   .saved-goal--inline > .saved-goal__header > .saved-goal__delete { top: 56px; right: 20px; }
 }
+
+
+/* Goals and portfolio profiles share the same expandable card header and surfaces. */
+.navigator-goals-panel { margin-top: 24px; }
+.saved-goal__toggle .goal-card__heading { min-height: 28px; }
+.saved-goal__description { color: var(--text-secondary); font-size: 14px; line-height: 20px; font-weight: 400; white-space: pre-wrap; }
+.portfolio-profile-card--island { display: block; padding: 0; }
+.portfolio-profile-list { gap: 4px; }
+.goal-card__icon--profile { background: var(--surface-alt); }
+.goal-card__icon--profile .icon { filter: brightness(0) saturate(100%) invert(11%); }
+.portfolio-profile-card__content .portfolio-profile-card__materials { gap: 4px; }
+.portfolio-profile-card__content .portfolio-profile-card__footer { border-radius: 16px; background: var(--surface); }
