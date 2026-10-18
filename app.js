@@ -5,14 +5,13 @@ const APP_ROOT_URL = new URL('./', import.meta.url)
 const ASSET = new URL('./public/assets/', APP_ROOT_URL).href
 
 const goals = [
-  { id: 'first-job', category: 'Индустрия', title: 'Найти первую работу или стажировку', kind: 'industry' },
+  { id: 'first-job', category: 'Индустрия', title: 'Выйти на первую работу или стажировку', kind: 'industry' },
+  { id: 'change-specialty', category: 'Индустрия', title: 'Был опыт работы, но хотелось поменять специальность', kind: 'industry' },
+  { id: 'change-company', category: 'Индустрия', title: 'Перейти в другую компанию, но не менять специальность', kind: 'industry' },
+  { id: 'promotion', category: 'Индустрия', title: 'Получить повышение по грейду и/или зарплате на текущем месте', kind: 'industry' },
   { id: 'freelance', category: 'Индустрия', title: 'Работать на фрилансе', kind: 'industry' },
-  { id: 'change-company', category: 'Индустрия', title: 'Сменить компанию, но не менять специальность', kind: 'industry' },
-  { id: 'change-specialty', category: 'Индустрия', title: 'Есть опыт, но хочу работать по другой специальности', kind: 'industry' },
-  { id: 'promotion', category: 'Индустрия', title: 'Повысить грейд или зарплату в текущей компании', kind: 'industry' },
-  { id: 'study', category: 'Учеба', title: 'Пока не думаю о карьерных изменениях, хочу учиться', kind: 'study' },
-  { id: 'business', category: 'Бизнес', title: 'Стать предпринимателем, запустить свой проект', kind: 'business', comingSoon: true },
-  { id: 'science', category: 'Наука', title: 'Развиваться в науке, провести исследование совместно с ЦУ', kind: 'science', comingSoon: true },
+  { id: 'science', category: 'Наука', title: 'Развиваться в науке и/или провести исследование совместно с ЦУ', kind: 'science' },
+  { id: 'business', category: 'Предпринимательство', title: 'Развиваться в роли предпринимателя и/или запустить свой проект', kind: 'business' },
 ]
 
 const MAX_GOALS = 2
@@ -30,14 +29,13 @@ const GOAL_SELECTION_KEY = 'cpk:goal-selection-draft'
 const SHOW_GOAL_INFO_DIALOG = false
 const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
-const CAREER_SALARY_OPTIONS = ['До 50 000', '50 000–100 000', '100 000–200 000', '200 000–300 000', 'Более 300 000']
-const VACANCY_SALARY_OPTIONS = [
-  { value: '0', label: 'Не важна' },
-  ...[50000, 100000, 150000, 200000, 300000].map((amount) => ({
-    value: String(amount),
-    label: `${amount.toLocaleString('ru-RU')} ₽`,
-  })),
+const CAREER_SALARY_OPTIONS = [
+  'До 50 000', '50 000 – 75 000', '75 000 – 100 000', '100 000 – 150 000',
+  '150 000 – 200 000', '200 000 – 250 000', '250 000 – 300 000',
+  '300 000 – 350 000', '350 000 – 400 000', 'Более 400 000',
 ]
+const SALARY_BOUNDARIES = [50000, 75000, 100000, 150000, 200000, 250000, 300000, 350000, 400000]
+const VACANCY_SALARY_OPTIONS = [{ value: '0', label: 'Не важна' }, ...CAREER_SALARY_OPTIONS]
 const APPLICATION_STATUSES = ['Новый', 'На рассмотрении', 'Интервью', 'Тестовое', 'Тех. собес', 'Оффер', 'Отказ', 'В архиве']
 
 const studyStages = [
@@ -198,8 +196,12 @@ const vacancyDirections = [
   { label: 'Информационная безопасность', value: 'security' },
 ]
 
-const ONBOARDING_SPECIALTY_OPTIONS = vacancyDirections.map(({ label }) => label)
-const normalizeOnboardingSpecialty = (value = '') => value === 'Дизайн' ? 'Дизайн и исследования' : value
+const ONBOARDING_SPECIALTY_OPTIONS = [
+  'Продуктовый менеджмент', 'Продуктовая аналитика', 'Экономика', 'Финансы',
+  'Бизнес аналитика', 'Data Science', 'Машинное обучение', 'Разработка',
+  'Продуктовый дизайн', 'Коммуникационно-графический дизайн', 'Медиаискусство', 'Биотех', 'Мой вариант',
+]
+const normalizeOnboardingSpecialty = (value = '') => !value || ONBOARDING_SPECIALTY_OPTIONS.includes(value) ? value : 'Мой вариант'
 
 const vacancies = vacancySeeds.map(([brandId, title], index) => {
   const [company, logo] = vacancyBrands[brandId]
@@ -240,6 +242,14 @@ const vacancies = vacancySeeds.map(([brandId, title], index) => {
   }
 })
 
+function salaryOverlaps(minimum, maximum, range) {
+  const index = CAREER_SALARY_OPTIONS.indexOf(range)
+  if (index < 0) return true
+  const lower = index === 0 ? 0 : SALARY_BOUNDARIES[index - 1]
+  const upper = SALARY_BOUNDARIES[index] ?? Infinity
+  return maximum >= lower && minimum <= upper
+}
+
 function normalizeApplicationSalary(value = '') {
   if (!value || value === '—') return ''
   if (CAREER_SALARY_OPTIONS.includes(value)) return value
@@ -248,11 +258,9 @@ function normalizeApplicationSalary(value = '') {
     .filter(Number.isFinite)
   const amount = numbers.length > 1 ? Math.max(...numbers) : numbers[0]
   if (!amount) return ''
-  if (amount < 50000) return CAREER_SALARY_OPTIONS[0]
-  if (amount <= 100000) return CAREER_SALARY_OPTIONS[1]
-  if (amount <= 200000) return CAREER_SALARY_OPTIONS[2]
-  if (amount <= 300000) return CAREER_SALARY_OPTIONS[3]
-  return CAREER_SALARY_OPTIONS[4]
+  if (/Более/i.test(value)) return ''
+  const index = SALARY_BOUNDARIES.findIndex((limit) => amount <= limit)
+  return CAREER_SALARY_OPTIONS[index < 0 ? CAREER_SALARY_OPTIONS.length - 1 : index]
 }
 
 function getApplications() {
@@ -337,23 +345,19 @@ function saveGoalFormValues(form) {
   try {
     const onboarding = getOnboarding()
     const previous = onboarding.values || {}
-    const firstStep = form.querySelector('#company')
-    const values = firstStep ? {
+    const values = {
       ...previous,
       noWork: Boolean(form.querySelector('[data-no-work]')?.checked),
       company: form.querySelector('#company')?.value || '',
       specialty: form.querySelector('#specialty')?.value || '',
+      specialtyOther: form.querySelector('#specialty-other')?.value || '',
       grade: form.querySelector('#grade')?.value || '',
       salary: form.querySelector('#salary')?.value || '',
-    } : {
-      ...previous,
-      noExpectations: Boolean(form.querySelector('[data-no-expectations]')?.checked),
-      desiredCompany: form.querySelector('#desired-company')?.value || '',
-      desiredSpecialty: [...(form.querySelector('#desired-specialty')?.selectedOptions || [])].map((option) => option.value),
-      desiredGrade: form.querySelector('#desired-grade')?.value || '',
-      desiredSalary: form.querySelector('#desired-salary')?.value || '',
+      workStart: form.querySelector('#work-start')?.value || '',
+      workEnd: form.querySelector('#work-end')?.value || '',
+      currentWork: Boolean(form.querySelector('[data-current-work]')?.checked),
     }
-    saveOnboarding({ ...onboarding, values, ...(firstStep ? { workReady: true, ready: onboarding.completed } : {}) })
+    saveOnboarding({ ...onboarding, values, workReady: true, ready: true })
   } catch {
     // Form editing still works for the current visit when storage is unavailable.
   }
@@ -626,9 +630,17 @@ function getStudyProgressSummary(progress = getStudyProgress()) {
   return { totalTasks, completedTasks, completedStages, percent: Math.round((completedTasks / totalTasks) * 100) }
 }
 
-function getIndustryProgress() {
+function getActiveCareerGoal() {
+  return getSavedGoals().find((goal) => goal.id === openedCareerGoalId) || getSavedGoals()[0] || null
+}
+
+function careerProgressKey(goal) {
+  return goal?.kind && goal.kind !== 'industry' ? `cpk:${goal.kind}-goal-progress` : INDUSTRY_PROGRESS_KEY
+}
+
+function getIndustryProgress(goal = getActiveCareerGoal()) {
   try {
-    const taskIds = JSON.parse(window.localStorage.getItem(INDUSTRY_PROGRESS_KEY) || '[]')
+    const taskIds = JSON.parse(window.localStorage.getItem(careerProgressKey(goal)) || '[]')
     return new Set(Array.isArray(taskIds) ? taskIds : [])
   } catch {
     return new Set()
@@ -637,7 +649,7 @@ function getIndustryProgress() {
 
 function saveIndustryProgress(taskIds) {
   try {
-    window.localStorage.setItem(INDUSTRY_PROGRESS_KEY, JSON.stringify([...taskIds]))
+    window.localStorage.setItem(careerProgressKey(getActiveCareerGoal()), JSON.stringify([...taskIds]))
   } catch {
     // The interaction still works for the current view when storage is unavailable.
   }
@@ -698,17 +710,12 @@ function getGoalSelection() {
 }
 
 function commitGoalSelection() {
-  if (!getOnboarding().ready) return false
+  if (!getOnboarding().ready && !getOnboarding().workReady && !getOnboarding().completed) return false
   const selected = getGoalSelection()
   if (!selected.length) return false
   const saved = getSavedGoalIds()
   selected.forEach((id) => {
-    const goal = goals.find((item) => item.id === id)
-    window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : INDUSTRY_PROGRESS_KEY)
-    if (goal.kind === 'study') {
-      window.localStorage.removeItem(PLANNER_STORAGE_KEY)
-      plannerState = createDefaultPlannerState()
-    }
+    window.localStorage.removeItem(careerProgressKey(goals.find((goal) => goal.id === id)))
   })
   window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify([...saved, ...selected]))
   saveOnboarding({ ...getOnboarding(), completed: true, ready: true, goalsChosen: true })
@@ -718,9 +725,8 @@ function commitGoalSelection() {
 }
 
 function resetGoalJourney() {
-  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, STUDY_PROGRESS_KEY, INDUSTRY_PROGRESS_KEY, PLANNER_STORAGE_KEY]
+  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, INDUSTRY_PROGRESS_KEY, 'cpk:science-goal-progress', 'cpk:business-goal-progress']
     .forEach((key) => window.localStorage.removeItem(key))
-  plannerState = createDefaultPlannerState()
 }
 
 const iconByKind = {
@@ -1045,20 +1051,20 @@ function appTemplate() {
       ${mobileNav({ backButton: true, backTarget: 'selection' })}
       ${informerFooter()}
       <main class="page-content work-step">
-        ${journeyHeader({ backAttributes: 'data-selection-back' })}
+        ${journeyHeader({ backAttributes: 'data-selection-back', title: 'Поставь карьерную цель на ближайший год', description: 'Карьерная цель помогает выбрать подходящие активности и вакансии' })}
         <div class="work-step__layout">
-          <section class="work-form work-form--goals" aria-labelledby="goals-heading">
+          <form class="work-form work-form--goals" aria-labelledby="goals-heading" data-career-goal-selection data-goal-form-final novalidate>
             <div class="work-form__heading">
-              ${getOnboarding().goalsChosen ? '' : '<span>Шаг 3 из 3</span>'}
+              ${getOnboarding().goalsChosen ? '' : '<span>Шаг 2 из 2</span>'}
               <h2 id="goals-heading" tabindex="-1">${getSavedGoals().length ? 'Добавь вторую цель' : 'Выбери цели'}</h2>
-              <p class="work-form__description">Выбери до двух целей: одну в Индустрии и одну в Учебе.</p>
+              <p class="work-form__description">Выбери одну или две цели из разных треков.</p>
             </div>
-            <div class="goal-grid">${goals.map(goalCard).join('')}</div>
+            <div class="goal-grid">${goals.filter((goal) => !getSavedGoals().some((saved) => saved.kind === goal.kind)).map(goalCard).join('')}</div>
             <div class="work-form__actions">
               ${controlButton({ className: 'flat-button flat-button--outline', content: 'Назад', attributes: 'data-selection-back' })}
-              ${controlButton({ className: 'flat-button flat-button--primary', content: getSavedGoals().length ? 'Добавить цель' : 'Продолжить', attributes: `data-confirm-goal-selection ${getGoalSelection().length ? '' : 'disabled'}` })}
+              ${controlButton({ className: 'flat-button flat-button--primary', content: getSavedGoals().length ? 'Добавить цель' : 'Поставить цель', type: 'submit', attributes: `data-confirm-goal-selection ${getGoalSelection().length ? '' : 'disabled'}` })}
             </div>
-          </section>
+          </form>
         </div>
       </main>
       <div id="modal-root"></div>
@@ -1066,7 +1072,6 @@ function appTemplate() {
 }
 
 function workExperienceTemplate() {
-  const editing = isEditingOnboarding()
   const values = getGoalFormValues()
   const fieldsDisabled = values.noWork ? 'disabled' : ''
   return `
@@ -1079,7 +1084,7 @@ function workExperienceTemplate() {
           ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>${isEditingOnboarding() ? 'К целям' : 'Назад'}</span>`, attributes: 'data-back-to-goals' })}
           <section class="header-island header-island--work" aria-labelledby="work-step-title">
             <div class="header-island__copy">
-              <h1 id="work-step-title" tabindex="-1">Определим точку старта</h1>
+              <h1 id="work-step-title" tabindex="-1">Зафиксируй точку старта</h1>
               <div class="header-island__support">
                 <p>Так мы сможем подобрать подходящие вакансии и карьерные возможности.</p>
               </div>
@@ -1092,15 +1097,23 @@ function workExperienceTemplate() {
         <div class="work-step__layout">
           <form class="work-form" data-onboarding-step="work" novalidate>
             <div class="work-form__heading">
-              <span>Шаг 1 из ${editing ? '2' : '3'}</span>
+              <span>Шаг 1 из 2</span>
               <h2>Расскажи о своей работе</h2>
             </div>
             <div class="work-form__fields">
               ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-work ${values.noWork ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
               ${fieldControl({ id: 'company', label: 'Компания*', placeholder: 'Название компании', value: values.company || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
               ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: normalizeOnboardingSpecialty(values.specialty), inputAttributes: fieldsDisabled, options: ONBOARDING_SPECIALTY_OPTIONS, errorMessage: 'Выбери специальность' })}
+              <div data-work-specialty-other ${normalizeOnboardingSpecialty(values.specialty) === 'Мой вариант' ? '' : 'hidden'}>
+                ${fieldControl({ id: 'specialty-other', label: 'Мой вариант*', placeholder: 'Укажи специальность', value: values.specialtyOther || (values.specialty && !ONBOARDING_SPECIALTY_OPTIONS.includes(values.specialty) ? values.specialty : ''), inputAttributes: values.noWork || normalizeOnboardingSpecialty(values.specialty) !== 'Мой вариант' ? 'disabled' : '', errorMessage: 'Укажи специальность' })}
+              </div>
               ${fieldControl({ id: 'grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.grade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
-              ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.salary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
+              ${fieldControl({ id: 'salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: normalizeApplicationSalary(values.salary), inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
+              <div class="work-form__date-row">
+              ${fieldControl({ id: 'work-start', label: 'Начало работы*', placeholder: 'Выбери дату', type: 'date', value: values.workStart || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи дату начала работы', dateIconContent: icon('application-calendar-picker.svg', 24), clearIconContent: icon('application-date-clear.svg', 24) })}
+              ${fieldControl({ id: 'work-end', label: 'Конец работы*', placeholder: 'Выбери дату', type: 'date', value: values.workEnd || '', inputAttributes: values.noWork || values.currentWork ? 'disabled' : '', errorMessage: 'Укажи дату окончания работы', dateIconContent: icon('application-calendar-picker.svg', 24), clearIconContent: icon('application-date-clear.svg', 24) })}
+              </div>
+              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-current-work ${values.currentWork ? 'checked' : ''} ${fieldsDisabled}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас работаю тут</span>' })}
             </div>
             ${controlButton({ className: 'work-form__submit flat-button flat-button--primary', content: 'Продолжить', type: 'submit' })}
           </form>
@@ -1111,15 +1124,15 @@ function workExperienceTemplate() {
     </div>`
 }
 
-function journeyHeader({ backAttributes = 'data-back-to-goals' } = {}) {
+function journeyHeader({ backAttributes = 'data-back-to-goals', title = 'Зафиксируй точку старта', description = 'Так мы сможем подобрать подходящие вакансии и карьерные возможности.' } = {}) {
   return `
     <div class="work-step__header">
       ${controlButton({ className: 'work-step__back', content: `${icon('arrow-left.svg')}<span>${isEditingOnboarding() ? 'К целям' : 'Назад'}</span>`, attributes: backAttributes })}
       <section class="header-island header-island--work" aria-labelledby="work-step-title">
         <div class="header-island__copy">
-          <h1 id="work-step-title" tabindex="-1">Определим точку старта</h1>
+          <h1 id="work-step-title" tabindex="-1">${title}</h1>
           <div class="header-island__support">
-            <p>Так мы сможем подобрать подходящие вакансии и карьерные возможности.</p>
+            <p>${description}</p>
           </div>
         </div>
       </section>
@@ -1138,39 +1151,7 @@ function privacyNote() {
 }
 
 function jobExpectationsTemplate() {
-  const values = getGoalFormValues()
-  const fieldsDisabled = values.noExpectations ? 'disabled' : ''
-  return `
-    <div class="app-shell">
-      ${globalNav()}
-      ${mobileNav({ backButton: true, backTarget: 'work' })}
-      ${informerFooter()}
-      <main class="page-content work-step">
-        ${journeyHeader()}
-
-        <div class="work-step__layout">
-          <form class="work-form work-form--expectations" data-onboarding-step="expectations" novalidate>
-            <div class="work-form__heading">
-              <span>Шаг 2 из ${isEditingOnboarding() ? '2' : '3'}</span>
-              <h2>Расскажи об ожиданиях от работы</h2>
-            </div>
-            <div class="work-form__fields">
-              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-expectations ${values.noExpectations ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не знаю</span>' })}
-              ${fieldControl({ id: 'desired-company', label: 'В каких компаниях хочешь работать*', placeholder: 'Названия компаний', value: values.desiredCompany || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи хотя бы одну компанию' })}
-              ${fieldControl({ id: 'desired-specialty', label: 'Специальность*', placeholder: 'Выбери одну или несколько специальностей', value: (values.desiredSpecialty || []).map(normalizeOnboardingSpecialty), multiple: true, checkContent: icon('check-small.svg', 16), inputAttributes: fieldsDisabled, options: ONBOARDING_SPECIALTY_OPTIONS, errorMessage: 'Выбери хотя бы одну специальность' })}
-              ${fieldControl({ id: 'desired-grade', label: 'Грейд*', placeholder: 'Выбери наиболее подходящий грейд', value: values.desiredGrade || '', inputAttributes: fieldsDisabled, options: ['Стажер', 'Джуниор', 'Мидл', 'Сеньор'], errorMessage: 'Выбери грейд' })}
-              ${fieldControl({ id: 'desired-salary', label: 'Зарплата (₽)', placeholder: 'Выбери диапазон', value: values.desiredSalary || '', inputAttributes: fieldsDisabled, options: CAREER_SALARY_OPTIONS, required: false })}
-            </div>
-            <div class="work-form__actions">
-              ${controlButton({ className: 'flat-button flat-button--outline', content: 'Назад', attributes: 'data-back-to-work' })}
-              ${controlButton({ className: 'flat-button flat-button--primary', content: isEditingOnboarding() ? 'Сохранить' : 'Продолжить', type: 'submit' })}
-            </div>
-          </form>
-
-        </div>
-      </main>
-      <div id="modal-root"></div>
-    </div>`
+  return workExperienceTemplate()
 }
 
 function surveyCompleteTemplate() {
@@ -1926,7 +1907,7 @@ function vacanciesTemplate() {
     return (!query || searchable.includes(query))
       && (!vacancySelectedDirections.size || vacancySelectedDirections.has(vacancy.direction))
       && (!vacancyFavoritesOnly || vacancyState.favorites.has(vacancy.id))
-      && (!Number(vacancySalaryFrom) || vacancy.salaryMax >= Number(vacancySalaryFrom))
+      && (vacancySalaryFrom === '0' || salaryOverlaps(vacancy.salaryMin, vacancy.salaryMax, vacancySalaryFrom))
       && selectedByGroup.every((selected) => !selected.length || selected.some((filter) => facets.has(filter)))
       && (vacancyInternships || !vacancy.tags.includes('Стажировка'))
   })
@@ -1956,7 +1937,7 @@ function vacanciesTemplate() {
           const [label, value] = Array.isArray(item) ? item : [item, item]
           return chipControl({ label, selected: vacancyFilters.has(value), attributes: `data-vacancy-filter="${value}"` })
         }).join('')}</div></div>`).join('')}
-        ${fieldControl({ id: 'vacancy-salary', label: 'Зарплата от', placeholder: 'Не важна', options: VACANCY_SALARY_OPTIONS, value: vacancySalaryFrom, inputAttributes: 'data-vacancy-salary', required: false })}
+        ${fieldControl({ id: 'vacancy-salary', label: 'Зарплата', placeholder: 'Не важна', options: VACANCY_SALARY_OPTIONS, value: vacancySalaryFrom, inputAttributes: 'data-vacancy-salary', required: false })}
         ${checkboxControl({ className: 'vacancy-internships', inputAttributes: `data-vacancy-internships ${vacancyInternships ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span><strong>Рассматриваю стажировки</strong><small>Интересные проекты с возможностью остаться в штате компании</small></span>' })}
         ${controlButton({ className: 'vacancy-filters__reset', content: 'Сбросить', attributes: 'data-vacancy-reset' })}
       </aside>
@@ -2336,7 +2317,7 @@ function openGoalDeleteDialog(goal) {
 function industryGoalTemplate() {
   const progress = getIndustryProgress()
   const summary = getIndustryProgressSummary(progress)
-  const selectedGoal = getSavedGoals().find((goal) => goal.kind === 'industry')
+  const selectedGoal = getActiveCareerGoal()
   const goalTitle = selectedGoal?.id === 'first-job'
     ? 'Выйти на первую работу или стажировку'
     : selectedGoal?.title || 'Выйти на первую работу или стажировку'
@@ -2350,7 +2331,7 @@ function industryGoalTemplate() {
         ${controlButton({ className: 'work-step__back study-detail__back', content: `${icon('arrow-left.svg', 18)}<span>К целям</span>`, attributes: 'data-back-to-my-goals' })}
         <section class="study-header" aria-labelledby="industry-detail-title">
           <div class="study-header__copy">
-            <h1 id="industry-detail-title" tabindex="-1">Индустрия</h1>
+            <h1 id="industry-detail-title" tabindex="-1">${selectedGoal?.category || 'Индустрия'}</h1>
             <p>Личная карьерная цель помогает выбрать курсы, активности, проекты и вакансии.<br>Если сложно сформулировать её самостоятельно — начни с консультации.</p>
           </div>
           <div class="study-header__illustration" aria-hidden="true">${icon('study-header-illustration.svg', 322)}</div>
@@ -2410,9 +2391,9 @@ function industryGoalTemplate() {
 }
 
 function savedGoalCard(goal) {
-  const track = goal.kind === 'study' ? 'Учеба' : 'Индустрия'
+  const track = goal.category
   const title = goal.kind === 'study' ? 'Хочу учиться' : goal.title
-  const summary = goal.kind === 'study' ? getStudySemesterProgress() : getIndustryProgressSummary()
+  const summary = goal.kind === 'study' ? getStudySemesterProgress() : getIndustryProgressSummary(getIndustryProgress(goal))
   const stageCount = goal.kind === 'study' ? summary.totalSemesters : industryStages.length
   const completedCount = goal.kind === 'study' ? summary.completedSemesters : summary.completedStages
 
@@ -2425,7 +2406,7 @@ function savedGoalCard(goal) {
         </div>
         <div class="saved-goal__actions">
           ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
-          ${controlButton({ className: 'flat-button flat-button--neutral saved-goal__open', content: 'Открыть', attributes: `data-open-saved-goal="${goal.kind}"` })}
+          ${controlButton({ className: 'flat-button flat-button--neutral saved-goal__open', content: 'Открыть', attributes: `data-open-saved-goal="${goal.kind}" data-saved-goal-id="${goal.id}"` })}
         </div>
       </header>
       <div class="saved-goal__body">
@@ -2471,6 +2452,7 @@ const root = document.querySelector('#root')
 let previouslyFocused = null
 let activeGoal = null
 let pageTransitioning = false
+let openedCareerGoalId = new URLSearchParams(window.location.search).get('goal')
 let requestedStudyTab = new URLSearchParams(window.location.search).get('tab')
 let requestedIndustryAction = new URLSearchParams(window.location.search).get('action')
 
@@ -2516,6 +2498,7 @@ function getScreenUrl(screen) {
   if (screen === 'industry-goal') {
     const url = new URL('study-goal/', APP_ROOT_URL)
     url.searchParams.set('view', 'industry')
+    if (openedCareerGoalId) url.searchParams.set('goal', openedCareerGoalId)
     if (requestedStudyTab) url.searchParams.set('tab', requestedStudyTab)
     if (requestedIndustryAction === 'add-application') url.searchParams.set('action', requestedIndustryAction)
     return `${url.pathname}${url.search}`
@@ -2539,6 +2522,7 @@ function syncStudyTabIndicator(tablist, { animate = true } = {}) {
 }
 
 function initializeCurrentScreen() {
+  updateWorkFormState()
   const tablist = root.querySelector('[data-study-tabs]')
   if (tablist && requestedStudyTab) {
     const requestedTab = tablist.querySelector(`[data-study-tab="${requestedStudyTab}"]`)
@@ -2557,12 +2541,12 @@ function initializeCurrentScreen() {
 function resolveJourneyScreen(screen) {
   const onboarding = getOnboarding()
   const hasGoals = getSavedGoals().length > 0
-  if (['work-experience', 'job-expectations'].includes(screen) && onboarding.completed && !isEditingOnboarding()) return hasGoals ? 'my-goals' : 'goal-selection'
-  if (screen === 'job-expectations' && !onboarding.workReady) return 'work-experience'
-  if (screen === 'goal-selection' && !onboarding.ready) return onboarding.workReady ? 'job-expectations' : 'work-experience'
+  if (screen === 'job-expectations') return resolveJourneyScreen('work-experience')
+  if (screen === 'work-experience' && onboarding.completed && !isEditingOnboarding()) return hasGoals ? 'my-goals' : 'goal-selection'
+  if (screen === 'goal-selection' && !onboarding.ready && !onboarding.workReady && !onboarding.completed) return 'work-experience'
   if (screen === 'goal-selection' && getSavedGoals().length >= MAX_GOALS) return 'my-goals'
   if (screen === 'study-goal' && !getSavedGoals().some((goal) => goal.kind === 'study')) return hasGoals ? 'my-goals' : 'goals'
-  if (screen === 'industry-goal' && !getSavedGoals().some((goal) => goal.kind === 'industry')) return hasGoals ? 'my-goals' : 'goals'
+  if (screen === 'industry-goal' && !getSavedGoals().length) return hasGoals ? 'my-goals' : 'goals'
   return screenRoutes[screen] ? screen : 'goals'
 }
 
@@ -3637,22 +3621,18 @@ root.addEventListener('click', (event) => {
     return
   }
 
-  if (event.target.closest('[data-confirm-goal-selection]')) {
-    if (commitGoalSelection()) renderScreen('my-goals')
-    return
-  }
-
   if (event.target.closest('[data-selection-back], [data-back-to-selection]')) {
-    if (!getOnboarding().goalsChosen) {
-      window.history.pushState({}, '', `${appRootPath}job-expectations/?edit=onboarding`)
-      renderScreen('job-expectations', { historyMode: 'none' })
-    } else renderScreen(getSavedGoals().length ? 'my-goals' : 'goals')
+    if (!getOnboarding().goalsChosen) renderScreen('work-experience')
+    else renderScreen('my-goals')
     return
   }
 
   const savedGoalButton = event.target.closest('[data-open-saved-goal]')
   if (savedGoalButton?.dataset.openSavedGoal === 'study') renderScreen('study-goal')
-  if (savedGoalButton?.dataset.openSavedGoal === 'industry') renderScreen('industry-goal')
+  if (savedGoalButton && savedGoalButton.dataset.openSavedGoal !== 'study') {
+    openedCareerGoalId = savedGoalButton.dataset.savedGoalId
+    renderScreen('industry-goal')
+  }
 
   const deleteCurrentGoal = event.target.closest('[data-delete-current-goal]')
   if (deleteCurrentGoal) {
@@ -3670,7 +3650,7 @@ root.addEventListener('click', (event) => {
       const remaining = getSavedGoalIds().filter((id) => id !== goal.id)
       window.localStorage.setItem(SAVED_GOALS_KEY, JSON.stringify(remaining))
       if (window.localStorage.getItem(PENDING_GOAL_KEY) === goal.id) window.localStorage.removeItem(PENDING_GOAL_KEY)
-      window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : INDUSTRY_PROGRESS_KEY)
+      window.localStorage.removeItem(goal.kind === 'study' ? STUDY_PROGRESS_KEY : careerProgressKey(goal))
       window.localStorage.removeItem(GOAL_SELECTION_KEY)
       if (goal.kind === 'study') {
         window.localStorage.removeItem(PLANNER_STORAGE_KEY)
@@ -4221,15 +4201,7 @@ root.addEventListener('change', (event) => {
     renderPlannerPanel({ focusSelector: '[data-planner-hide-progress]' })
   }
 
-  if (event.target.matches('[data-no-work]')) {
-    root.querySelectorAll('[data-ui-field]').forEach((field) => {
-      field.disabled = event.target.checked
-      field.closest('[data-ui-select]')?.querySelector('[data-ui-select-toggle]')?.toggleAttribute('disabled', event.target.checked)
-      field.closest('[data-ui-select]')?.querySelectorAll('[data-ui-select-checkbox]').forEach((checkbox) => { checkbox.disabled = event.target.checked })
-      field.closest('.ui-field').classList.toggle('ui-field--disabled', event.target.checked)
-      clearWorkFieldValidation(field)
-    })
-  }
+  if (event.target.matches('[data-no-work], [data-current-work], #specialty')) updateWorkFormState()
 
   if (event.target.matches('[data-no-expectations]')) {
     closeAllSingleSelects()
@@ -4243,6 +4215,7 @@ root.addEventListener('change', (event) => {
   }
 
   if (event.target.matches('[data-ui-field]')) validateWorkField(event.target)
+  if (event.target.id === 'work-start') validateWorkField(root.querySelector('#work-end'))
 })
 
 root.addEventListener('dragover', (event) => {
@@ -4285,9 +4258,38 @@ root.addEventListener('input', (event) => {
   }
 })
 
+function setWorkFieldDisabled(field, disabled) {
+  if (!field) return
+  field.disabled = disabled
+  const container = field.closest('.ui-field')
+  container.classList.toggle('ui-field--disabled', disabled)
+  container.querySelectorAll('button').forEach((button) => { button.disabled = disabled })
+  if (disabled) clearWorkFieldValidation(field)
+}
+
+function updateWorkFormState() {
+  const form = root.querySelector('[data-onboarding-step="work"]')
+  if (!form) return
+  const noWork = form.querySelector('[data-no-work]').checked
+  const other = form.querySelector('#specialty').value === 'Мой вариант'
+  const current = form.querySelector('[data-current-work]')
+  form.querySelector('[data-work-specialty-other]').hidden = !other
+  current.disabled = noWork
+  form.querySelectorAll('[data-ui-field]').forEach((field) => {
+    setWorkFieldDisabled(field, noWork || (field.id === 'specialty-other' && !other) || (field.id === 'work-end' && current.checked))
+  })
+  closeAllApplicationDatePickers()
+}
+
 function validateWorkField(field) {
   const container = field.closest('.ui-field')
-  const valid = field.disabled || !field.required || field.value.trim() !== ''
+  let valid = field.disabled || !field.required || field.value.trim() !== ''
+  if (field.id === 'work-end') {
+    const start = root.querySelector('#work-start')?.value
+    const wrongOrder = !field.disabled && start && field.value && field.value < start
+    if (wrongOrder) valid = false
+    container.querySelector('.ui-field__error').textContent = wrongOrder ? 'Дата окончания не может быть раньше даты начала' : 'Укажи дату окончания работы'
+  }
   field.classList.toggle('has-value', field.value.trim() !== '')
   container.classList.toggle('ui-field--error', !valid)
   field.setAttribute('aria-invalid', String(!valid))
@@ -4295,7 +4297,7 @@ function validateWorkField(field) {
   if (valid) field.removeAttribute('aria-describedby')
   else field.setAttribute('aria-describedby', `${field.id}-error`)
 
-  const trigger = container.querySelector('[data-ui-select-toggle]')
+  const trigger = container.querySelector('[data-ui-select-toggle], [data-ui-date-toggle]')
   if (trigger) {
     trigger.setAttribute('aria-invalid', String(!valid))
     if (valid) trigger.removeAttribute('aria-describedby')
@@ -4309,7 +4311,7 @@ function clearWorkFieldValidation(field) {
   field.closest('.ui-field').classList.remove('ui-field--error')
   field.setAttribute('aria-invalid', 'false')
   field.removeAttribute('aria-describedby')
-  const trigger = field.closest('.ui-field').querySelector('[data-ui-select-toggle]')
+  const trigger = field.closest('.ui-field').querySelector('[data-ui-select-toggle], [data-ui-date-toggle]')
   trigger?.setAttribute('aria-invalid', 'false')
   trigger?.removeAttribute('aria-describedby')
 }
@@ -4321,6 +4323,12 @@ function focusWorkField(field) {
 }
 
 root.addEventListener('submit', (event) => {
+  if (event.target.matches('[data-career-goal-selection]')) {
+    event.preventDefault()
+    if (commitGoalSelection()) renderScreen('success')
+    return
+  }
+
   if (event.target.matches('[data-vacancy-application-form]')) {
     event.preventDefault()
     const consent = event.target.querySelector('[data-vacancy-application-consent]')
@@ -4467,17 +4475,11 @@ root.addEventListener('submit', (event) => {
 
   saveGoalFormValues(event.target)
 
-  if (event.target.dataset.onboardingStep === 'expectations') {
-    const editing = isEditingOnboarding()
-    saveOnboarding({ ...getOnboarding(), completed: true, ready: true })
-    renderScreen(editing && getSavedGoals().length ? 'my-goals' : 'goal-selection')
-    return
-  }
-
-  renderScreen('job-expectations')
+  renderScreen(isEditingOnboarding() ? 'my-goals' : 'goal-selection')
 })
 
 window.addEventListener('popstate', () => {
+  openedCareerGoalId = new URLSearchParams(window.location.search).get('goal')
   selectedVacancyId = new URLSearchParams(window.location.search).get('id')
   editingPortfolioProfileId = new URLSearchParams(window.location.search).get('id')
   if (['goals', 'industry-goal', 'study-goal'].includes(getScreenFromLocation())) requestedStudyTab = new URLSearchParams(window.location.search).get('tab') || (getScreenFromLocation() === 'goals' ? 'about' : null)

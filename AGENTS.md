@@ -44,16 +44,16 @@
 ## Goal-setting forms
 
 - Use the shared `surveyCompleteTemplate()` screen after successful completion of every goal-setting flow, regardless of the selected goal or form variant.
-- Show the job-expectations second step only for `first-job`, `freelance`, `change-company`, and `change-specialty`; all other goal flows finish after the first form step.
+- Career goal setup has two steps: work experience, then goal selection. Do not show the job-expectations step; its legacy URL redirects to work experience.
 - Mark the final form in a goal-setting flow with `data-goal-form-final`; after successful component validation, submit it through the shared page-background transition to `surveyCompleteTemplate()`.
 - Intermediate forms may use `data-goal-form`, but must continue to the next step instead of showing success early.
 - Do not create goal-specific success screens unless the user explicitly replaces this rule.
 - A student can keep at most two goals. Persist selected goal IDs between route entries and enforce the limit both when choosing and when rendering goals.
-- Allow no more than one saved goal per track: one Industry goal and one Study goal.
+- Allow one or two career goals, with no more than one goal per track: Industry, Science, Entrepreneurship. Study is available by default and is not a selectable career goal.
 - Keep the `+ Цель` button enabled at the two-goal limit. At the limit, clicking it must open a warning that one current goal needs to be deleted before adding another.
 - Render only goals the student has actually added; one saved goal produces one goal card, and two saved goals produce two cards.
 - Every newly added goal starts at `0%` and `0 / 5 этапов завершено`.
-- Industry selections render an Industry goal card; Study selections render a Study goal card.
+- Career cards must display the selected goal’s actual track and maintain progress independently between tracks. Removing or adding career goals must not reset the separate study plan.
 - The Study goal opens `/study-goal/`. Its progress is derived from completed checklist tasks, and an entire stage counts as complete only when all of its tasks are checked.
 - Open the Study goal on its `Моя цель` tab by default; other tabs open only after an explicit tab selection.
 - Study-detail tabs use one animated sliding background indicator and remain keyboard-accessible.

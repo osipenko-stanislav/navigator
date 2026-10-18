@@ -1553,3 +1553,13 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 @media (max-width: 420px) {
   .applications-onboarding__actions { width: 100%; flex-direction: column; }
 }
+
+.work-form__date-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.work-form__date-row .ui-field { min-width: 0; }
+
+.work-form__date-row .ui-date-picker { max-width: calc(100vw - 56px); }
+.work-form__date-row > .ui-field:first-child .ui-date-picker { right: auto; left: -1px; }
+@media (max-width: 420px) {
+  .work-form__date-row .ui-field__control--date { gap: 4px; padding-inline: 8px; }
+  .work-form__date-row :is(.ui-date__clear, .ui-date__calendar) { width: 20px; flex-basis: 20px; }
+}
