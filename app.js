@@ -255,60 +255,17 @@ function normalizeApplicationSalary(value = '') {
   return CAREER_SALARY_OPTIONS[4]
 }
 
-function previousApplicationDate(daysAgo) {
-  const date = new Date()
-  date.setDate(date.getDate() - daysAgo)
-  return applicationDateValue(date)
-}
-
-const defaultApplications = [
-  ['Яндекс', 'ML Engineer Intern', CAREER_SALARY_OPTIONS[1], 'Новый', 1],
-  ['Т-Банк', 'Data Analyst', CAREER_SALARY_OPTIONS[2], 'Оффер', 3],
-  ['Ozon Tech', 'Backend Developer', '—', 'Интервью', 6],
-  ['Яндекс', 'Research ML', CAREER_SALARY_OPTIONS[1], 'Оффер', 9],
-  ['Т-Банк', 'Product Analyst', CAREER_SALARY_OPTIONS[2], 'Отказ', 13],
-  ['Ozon Tech', 'UX Researcher', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 16],
-  ['Яндекс', 'Frontend Developer', '—', 'Отказ', 20],
-  ['Т-Банк', 'QA Engineer', CAREER_SALARY_OPTIONS[1], 'Тестовое', 24],
-  ['Ozon Tech', 'Product Manager', CAREER_SALARY_OPTIONS[2], 'Тех. собес', 29],
-  ['Яндекс', 'Data Engineer', '—', 'Новый', 33],
-  ['Lamoda Tech', 'Продуктовый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 38],
-  ['Сбер', 'Frontend-разработчик', CAREER_SALARY_OPTIONS[2], 'Интервью', 42],
-  ['Альфа-Банк', 'Java-разработчик', CAREER_SALARY_OPTIONS[2], 'Тестовое', 47],
-  ['МТС', 'Data Engineer', CAREER_SALARY_OPTIONS[1], 'Тех. собес', 53],
-  ['Циан', 'UX/UI-дизайнер', CAREER_SALARY_OPTIONS[1], 'Новый', 58],
-  ['VK Tech', 'Python-разработчик', CAREER_SALARY_OPTIONS[2], 'Оффер', 64],
-  ['Райффайзен Банк', 'Бизнес-аналитик', CAREER_SALARY_OPTIONS[1], 'В архиве', 69],
-  ['Туту', 'Маркетинговый аналитик', CAREER_SALARY_OPTIONS[1], 'На рассмотрении', 75],
-  ['СДЭК', 'QA-инженер', CAREER_SALARY_OPTIONS[1], 'Отказ', 82],
-  ['Лемана ПРО', 'BI-аналитик', CAREER_SALARY_OPTIONS[2], 'Интервью', 88],
-  ['Билайн', 'Инженер по тестированию', CAREER_SALARY_OPTIONS[1], 'Тестовое', 95],
-  ['Яндекс Пэй', 'Системный аналитик', CAREER_SALARY_OPTIONS[2], 'Новый', 103],
-].map(([company, position, salary, status, daysAgo], index) => ({
-  id: `demo-${index + 1}`, internal: index < 3, vacancyId: null, company, date: previousApplicationDate(daysAgo), status, position, salary,
-  source: index < 3 ? 'ЦУ' : 'Внешний источник', link: '', contact: '', notes: '',
-}))
-
 function getApplications() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(APPLICATIONS_STORAGE_KEY) || 'null')
-    const source = Array.isArray(saved)
-      ? [...saved, ...defaultApplications.filter((item) => !saved.some((savedItem) => savedItem.id === item.id))]
-      : defaultApplications
-    const result = source
-      .map((item) => {
-        const demoIndex = defaultApplications.findIndex((demo) => demo.id === item.id)
-        const legacyDate = applicationDateValue(new Date(2026, 5, 11 - Math.max(0, demoIndex - 9)))
-        return {
-          ...item,
-          date: demoIndex >= 0 && item.date === legacyDate ? defaultApplications[demoIndex].date : item.date,
-          salary: normalizeApplicationSalary(item.salary),
-        }
-      })
+    // Remove the previous demo rows while keeping applications added during testing.
+    const result = (Array.isArray(saved) ? saved : [])
+      .filter((item) => item && typeof item.id === 'string' && !/^demo-\d+$/.test(item.id))
+      .map((item) => ({ ...item, salary: normalizeApplicationSalary(item.salary) }))
     try { window.localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify(result)) } catch { /* Keep the session interactive. */ }
     return result
   } catch {
-    return defaultApplications
+    return []
   }
 }
 
@@ -2057,7 +2014,7 @@ function applicationsTemplate() {
         </table>
         ${rows.length ? `<div class="applications-edit-rail" aria-label="Действия с откликами">${rows.map((item) => controlButton({ className: 'application-edit', content: icon('edit.svg', 20), attributes: `aria-label="Редактировать отклик ${item.company}" data-application-edit="${item.id}"` })).join('')}</div>` : ''}
       </div>
-      ${rows.length ? '' : '<div class="applications-empty">По выбранным фильтрам откликов нет</div>'}
+      ${rows.length ? '' : `<div class="applications-empty">${hasFilters ? 'По выбранным фильтрам откликов нет' : 'Здесь появятся твои отклики'}</div>`}
       <div class="applications-pager">
         <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => controlButton({ className: `applications-page ${page === applicationPage ? 'is-current' : ''}`, content: String(page), attributes: `data-application-page="${page}" ${page === applicationPage ? 'aria-current="page"' : ''}` })).join('')}</div>
         <span>${filtered.length ? `${(applicationPage - 1) * 10 + 1}–${Math.min(applicationPage * 10, filtered.length)}` : '0'} из ${filtered.length}</span>
@@ -3326,7 +3283,7 @@ function restartScenario() {
 
   plannerState = createDefaultPlannerState()
   vacancyState = { favorites: new Set(), applied: new Set() }
-  applications = defaultApplications.map((item) => ({ ...item }))
+  applications = []
   portfolioProfiles = []
   editingPortfolioProfileId = null
   portfolioDraftFiles = { resume: undefined, portfolio: undefined }
