@@ -1566,3 +1566,5 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 
 
 .ui-select__options, .ui-multiselect__options { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+
+.ui-date-picker { overflow-y: auto; overscroll-behavior: contain; }

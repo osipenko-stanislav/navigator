@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=26'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=27'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -3377,6 +3377,7 @@ function renderApplicationDatePicker(field) {
         attributes: `data-ui-date-day="${value}" aria-label="${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}"${isSelected ? ' aria-current="date"' : ''}`,
       })
     }).join('')}</span>`
+  positionDropdown(field)
 }
 
 function closeApplicationDatePicker(field) {
@@ -3500,7 +3501,7 @@ root.addEventListener('click', (event) => {
     return
   }
 
-  const dateMonth = event.target.closest('[data-ui-date-month]')
+  const dateMonth = event.target.closest('button[data-ui-date-month]')
   if (dateMonth) {
     const field = dateMonth.closest('[data-ui-date]')
     const [year, month] = field.dataset.uiDateMonth.split('-').map(Number)
@@ -4067,7 +4068,7 @@ document.addEventListener('click', (event) => {
   if (!event.target.closest('#planner-course-menu, [data-planner-menu-toggle], [data-planner-course-action="semesters"], [data-planner-menu-back]')) closePlannerCourseMenu()
   if (!event.target.closest('[data-ui-multiselect^="planner-available-"], [data-planner-filter-toggle]')) closePlannerAvailableFilters()
   if (!event.target.closest('[data-ui-select]')) closeAllSingleSelects()
-  if (!event.target.closest('[data-ui-date]')) closeAllApplicationDatePickers()
+  if (!event.composedPath().some((node) => node.matches?.('[data-ui-date]'))) closeAllApplicationDatePickers()
   if (!event.target.closest('[data-ui-multiselect]')) closeVacancyDirectionSelect()
   if (!event.target.closest('[data-ui-multiselect^="catalog-"]')) closeCatalogFilters()
   if (!event.target.closest('[data-application-filter-toggle], [data-ui-multiselect^="application-"]') && applicationFilterOpen) {
@@ -4774,7 +4775,7 @@ function scheduleDropdownPositioning() {
   if (dropdownPositionFrame) return
   dropdownPositionFrame = window.requestAnimationFrame(() => {
     dropdownPositionFrame = 0
-    root.querySelectorAll('[data-ui-select].is-open, [data-ui-multiselect].is-open').forEach(positionDropdown)
+    root.querySelectorAll('[data-ui-select].is-open, [data-ui-multiselect].is-open, [data-ui-date].is-date-open').forEach(positionDropdown)
   })
 }
 
@@ -4784,7 +4785,7 @@ window.addEventListener('resize', scheduleDropdownPositioning)
 window.visualViewport?.addEventListener('resize', scheduleDropdownPositioning)
 window.visualViewport?.addEventListener('scroll', scheduleDropdownPositioning)
 document.addEventListener('scroll', (event) => {
-  if (event.target.closest?.('.ui-select__options, .ui-multiselect__options')) return
+  if (event.target.closest?.('.ui-select__options, .ui-multiselect__options, .ui-date-picker')) return
   scheduleDropdownPositioning()
 }, true)
 scheduleDropdownPositioning()

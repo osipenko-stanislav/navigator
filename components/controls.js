@@ -233,8 +233,8 @@ export function multiSelectControl({ id, label, placeholder, options, selected =
 
 
 export function positionDropdown(field) {
-  const menu = field.querySelector('.ui-select__options, .ui-multiselect__options')
-  const trigger = field.querySelector('.ui-select__trigger, .ui-multiselect__trigger')
+  const menu = field.querySelector('.ui-select__options, .ui-multiselect__options, .ui-date-picker')
+  const trigger = field.querySelector('.ui-select__trigger, .ui-multiselect__trigger, .ui-field__control--date')
   if (!menu || menu.hidden || !trigger || !trigger.getClientRects().length) return
 
   // Measure from the component's default geometry on every opening or viewport change.
