@@ -2146,10 +2146,10 @@ function portfolioTemplate() {
           <div class="portfolio-content__add">${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Профиль</span>`, attributes: 'data-portfolio-add' })}</div>` : `
           <div class="portfolio-empty">
             <div class="portfolio-empty__copy">
-              <h2>Подготовь материалы для отклика</h2>
-              <p>Заполни несколько профилей, добавь в них резюме и портфолио по своей профессии и сопроводительное письмо. Ты сможешь использовать профили при отклике на вакансии.</p>
+              <h2>Добавь свои резюме и портфолио</h2>
+              <p>Для каждой вакансии ты сможешь выбрать профиль, который лучше всего подходит под требования работодателя.</p>
             </div>
-            ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Профиль</span>`, attributes: 'data-portfolio-add' })}
+            ${controlButton({ className: 'flat-button flat-button--primary', content: 'Добавить', attributes: 'data-portfolio-add' })}
           </div>`}
       </section>
       ${portfolioPreparationPanel()}
