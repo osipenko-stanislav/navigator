@@ -940,18 +940,26 @@ function infoPanel() {
 
 function navigatorGoalsTemplate() {
   const savedGoals = getSavedGoals()
+  if (!savedGoals.length) {
+    return `<div class="portfolio-layout">
+      <section class="portfolio-content" aria-labelledby="my-goals-title">
+        <div class="portfolio-empty">
+          <div class="portfolio-empty__copy">
+            <h2 id="my-goals-title" tabindex="-1">Поставь цель</h2>
+            <p>Здесь собраны шаги, которые помогут тебе достичь карьерной цели. Отмечай задачи по мере их выполнения.</p>
+          </div>
+          ${controlButton({ className: 'flat-button flat-button--primary', content: 'Поставить цель', attributes: 'data-add-goal' })}
+        </div>
+      </section>
+      ${portfolioPreparationPanel('goals-preparation-title')}
+    </div>`
+  }
   return `<section class="navigator-goals-panel" aria-labelledby="my-goals-title">
     <div class="navigator-goals-panel__header">
       <h2 id="my-goals-title" tabindex="-1">Мои цели</h2>
       ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Цель</span>`, attributes: 'data-add-goal' })}
     </div>
-    <div class="saved-goals-list">
-      ${savedGoals.length ? savedGoals.map(savedGoalCard).join('') : `
-        <div class="my-goals-empty">
-          <p>Здесь появятся твои цели</p>
-          ${controlButton({ className: 'flat-button flat-button--primary', content: `${icon('plus.svg', 20)}<span>Добавить цель</span>`, attributes: 'data-add-goal' })}
-        </div>`}
-    </div>
+    <div class="saved-goals-list">${savedGoals.map(savedGoalCard).join('')}</div>
   </section>`
 }
 
@@ -2114,11 +2122,11 @@ function portfolioProfileCard(profile, index, profiles) {
     </article>`
 }
 
-function portfolioPreparationPanel() {
+function portfolioPreparationPanel(titleId = 'portfolio-preparation-title') {
   return `
-    <aside class="portfolio-preparation" aria-labelledby="portfolio-preparation-title">
+    <aside class="portfolio-preparation" aria-labelledby="${titleId}">
       <div class="portfolio-preparation__body">
-        <h2 id="portfolio-preparation-title">Подготовка</h2>
+        <h2 id="${titleId}">Подготовка</h2>
         <p>Обратись к консультанту — он поможет составить резюме и портфолио под твою специальность с учётом твоего опыта и навыков.</p>
         <img src="${ASSET}portfolio-preparation.png" width="275" height="146" alt="">
       </div>
