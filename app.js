@@ -982,7 +982,7 @@ function invitationTemplate() {
         <section class="navigator-landing__hero" aria-labelledby="invitation-title">
           <div class="navigator-landing__intro">
             <h1 id="invitation-title" tabindex="-1">Навигатор</h1>
-            <p class="navigator-landing__lead">Планируй карьеру и учебу в одном месте.</p>
+            <h2 class="navigator-landing__lead">Планируй карьеру и учебу в одном месте</h2>
             <p>Здесь можно поставить карьерную цель, откликаться на партнерские вакансии, вести трекер откликов и подбирать нужные курсы.</p>
             <div class="navigator-landing__actions">
               ${controlButton({ className: 'flat-button flat-button--primary', content: 'Заняться карьерой' })}

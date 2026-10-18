@@ -1482,7 +1482,7 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .navigator-landing__hero { position: relative; display: flex; align-items: center; min-height: 360px; padding: 40px; overflow: hidden; }
 .navigator-landing__intro { position: relative; z-index: 1; width: 60%; }
 .navigator-landing__intro h1 { margin-bottom: 8px; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -.5px; }
-.navigator-landing__intro .navigator-landing__lead { margin-bottom: 8px; }
+.navigator-landing__intro .navigator-landing__lead { margin-bottom: 8px; font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
 .navigator-landing p, .navigator-landing li, .navigator-landing h3 { font-size: 14px; line-height: 20px; }
 .navigator-landing__intro p { max-width: 470px; color: var(--text-secondary); text-wrap: pretty; }
 .navigator-landing__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 24px; }
