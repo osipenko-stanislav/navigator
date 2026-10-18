@@ -978,18 +978,44 @@ function invitationTemplate() {
   return `
     <div class="app-shell">
       ${globalNav()}${mobileNav()}${informerFooter()}
-      <main class="page-content">
-        ${headerIsland()}
-        <div class="workspace">
-          <section class="portfolio-empty goal-invitation" aria-labelledby="invitation-title">
-            <div class="portfolio-empty__copy">
-              <h2 id="invitation-title" tabindex="-1">Выбери, к чему хочешь прийти</h2>
-              <p>${getOnboarding().completed ? 'Выбери до двух целей, чтобы спланировать учебу и карьерные шаги. Данные о работе и ожиданиях сохранены — их можно изменить позже.' : 'Расскажи о своей работе и ожиданиях, а затем выбери до двух целей. Они помогут спланировать учебу и карьерные шаги. Данные и цели можно изменить позже.'}</p>
+      <main class="page-content navigator-landing">
+        <section class="navigator-landing__hero" aria-labelledby="invitation-title">
+          <div class="navigator-landing__intro">
+            <h1 id="invitation-title" tabindex="-1">Навигатор</h1>
+            <h2>Планируй карьеру и учебу<br class="navigator-landing__desktop-break"> в одном месте</h2>
+            <p>Здесь можно поставить карьерную цель, откликаться на партнерские вакансии, вести трекер откликов и подбирать нужные курсы.</p>
+            <div class="navigator-landing__actions">
+              ${controlButton({ className: 'flat-button flat-button--primary', content: 'Заняться карьерой' })}
+              ${controlButton({ variant: 'flat-outline', content: 'Подобрать учебный план' })}
             </div>
-            ${controlButton({ className: 'flat-button flat-button--primary', content: 'Выбрать цель', attributes: 'data-start-onboarding' })}
-          </section>
-          ${infoPanel()}
-        </div>
+          </div>
+          <img class="navigator-landing__art" src="${ASSET}goals-header-illustration.svg" width="389" height="300" alt="" aria-hidden="true">
+        </section>
+
+        <section class="navigator-landing__help" aria-labelledby="navigator-help-title">
+          <div class="navigator-landing__help-copy">
+            <h2 id="navigator-help-title">Если нужна помощь</h2>
+            <p>Запишись на карьерную консультацию<br class="navigator-landing__desktop-break"> или задай общий вопрос по карьере.</p>
+            <div class="navigator-landing__actions">
+              ${controlButton({ className: 'flat-button flat-button--primary', content: 'Хочу консультацию' })}
+              ${controlButton({ variant: 'flat-outline', content: 'Хочу задать общий вопрос' })}
+            </div>
+          </div>
+          <div class="navigator-landing__mayak">
+            <h3>${icon('message-chat-square.svg', 20)}<span>Как задать общий вопрос</span></h3>
+            <p>Введи <span class="navigator-landing__command">/mayak</span> и выбери:</p>
+            <p class="navigator-landing__help-path">Учеба и карьера <span aria-hidden="true">→</span> Центр партнерств и карьеры <span aria-hidden="true">→</span> Навигация по карьерным возможностям</p>
+          </div>
+        </section>
+
+        <section class="navigator-landing__goals" aria-labelledby="navigator-goals-title">
+          <h2 id="navigator-goals-title">Как работают цели</h2>
+          <ul class="navigator-landing__rules">
+            <li>${icon('compass.svg', 20)}<span>У тебя может быть по одной цели в каждом треке: индустрия, наука и предпринимательство</span></li>
+            <li>${icon('stars.svg', 20)}<span>Одна цель — всегда основная</span></li>
+            <li>${icon('edit.svg', 20)}<span>Ты можешь поменять цель в любой момент</span></li>
+          </ul>
+        </section>
       </main>
       <div id="modal-root"></div>
     </div>`
@@ -2488,7 +2514,6 @@ function initializeCurrentScreen() {
 function resolveJourneyScreen(screen) {
   const onboarding = getOnboarding()
   const hasGoals = getSavedGoals().length > 0
-  if (screen === 'goals' && hasGoals) return 'my-goals'
   if (screen === 'my-goals' && !hasGoals) return 'goals'
   if (['work-experience', 'job-expectations'].includes(screen) && onboarding.completed && !isEditingOnboarding()) return hasGoals ? 'my-goals' : 'goal-selection'
   if (screen === 'job-expectations' && !onboarding.workReady) return 'work-experience'
