@@ -647,9 +647,9 @@ function getIndustryProgress(goal = getActiveCareerGoal()) {
   }
 }
 
-function saveIndustryProgress(taskIds) {
+function saveIndustryProgress(taskIds, goal = getActiveCareerGoal()) {
   try {
-    window.localStorage.setItem(careerProgressKey(getActiveCareerGoal()), JSON.stringify([...taskIds]))
+    window.localStorage.setItem(careerProgressKey(goal), JSON.stringify([...taskIds]))
   } catch {
     // The interaction still works for the current view when storage is unavailable.
   }
@@ -1228,21 +1228,21 @@ function industryTaskUrl(action) {
   return url.href
 }
 
-function industryStageTemplate(stage, stageIndex, progress) {
+function industryStageTemplate(stage, stageIndex, progress, goal = null) {
   const completed = stage.tasks.filter((_, taskIndex) => progress.has(`${stage.id}-${taskIndex}`)).length
   const expanded = stageIndex === 0
+  const prefix = goal ? `goal-${goal.id}` : 'industry'
 
   return `
     <article class="study-stage ${expanded ? 'study-stage--expanded' : ''}" data-industry-stage="${stage.id}">
       ${controlButton({
         className: 'study-stage__toggle',
-        attributes: `aria-expanded="${expanded}" aria-controls="industry-stage-panel-${stage.id}" data-industry-stage-toggle`,
+        attributes: `aria-expanded="${expanded}" aria-controls="${prefix}-stage-panel-${stage.id}" data-industry-stage-toggle`,
         content: `
         <span class="study-stage__copy">
           <span class="study-stage__title-line">
             <strong>${stage.title}</strong>
-            ${icon('dot-single.svg', 16)}
-            <span data-industry-stage-count>${completed} из ${stage.tasks.length}</span>
+            ${goal ? '' : `${icon('dot-single.svg', 16)}<span data-industry-stage-count>${completed} из ${stage.tasks.length}</span>`}
           </span>
           <span class="study-stage__description">${stage.description}</span>
         </span>
@@ -1251,16 +1251,18 @@ function industryStageTemplate(stage, stageIndex, progress) {
           <img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt="">
         </span>`,
       })}
-      <div class="study-stage__panel" id="industry-stage-panel-${stage.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
+      <div class="study-stage__panel" id="${prefix}-stage-panel-${stage.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
         <div class="study-stage__panel-inner">
           <div class="study-stage__tasks">
             ${stage.tasks.map(([title, description, action], taskIndex) => {
               const taskId = `${stage.id}-${taskIndex}`
-              const actionUrl = action ? industryTaskUrl(action) : ''
+              const inlineAction = goal && action?.tab
+              const actionUrl = action && !inlineAction ? industryTaskUrl(action) : ''
+              const tooltipId = `${prefix}-task-tooltip-${taskId}`
               return `<div class="study-task industry-task">
                 ${checkboxControl({
                   className: 'industry-task__check',
-                  inputAttributes: `data-industry-task value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
+                  inputAttributes: `${goal ? `data-saved-goal-task="${goal.id}"` : 'data-industry-task'} value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
                   boxContent: icon('check-small.svg', 20),
                   content: `<span class="study-task__copy"><strong>${title}</strong><span>${description}</span></span>`,
                 })}
@@ -1270,10 +1272,12 @@ function industryStageTemplate(stage, stageIndex, progress) {
                   content: escapeHTML(action.label),
                   href: actionUrl,
                   target: '_blank',
-                  attributes: actionUrl
+                  attributes: inlineAction
+                    ? `data-inline-goal-action="${action.tab}" ${action.openApplication ? 'data-inline-goal-application' : ''}`
+                    : actionUrl
                     ? `aria-label="${escapeHTML(`${action.label}: ${title}. Откроется в новой вкладке`)}"`
-                    : `data-industry-task-pending aria-controls="industry-task-tooltip-${taskId}" aria-label="${escapeHTML(`${action.label}: ${title}`)}"`,
-                })}${actionUrl ? '' : `<span class="industry-task__tooltip" id="industry-task-tooltip-${taskId}" role="tooltip" aria-live="polite" hidden>Готовим</span>`}</span>` : ''}
+                    : `data-industry-task-pending aria-controls="${tooltipId}" aria-label="${escapeHTML(`${action.label}: ${title}`)}"`,
+                })}${actionUrl || inlineAction ? '' : `<span class="industry-task__tooltip" id="${tooltipId}" role="tooltip" aria-live="polite" hidden>Готовим</span>`}</span>` : ''}
               </div>`
             }).join('')}
           </div>
@@ -2391,32 +2395,28 @@ function industryGoalTemplate() {
 }
 
 function savedGoalCard(goal) {
-  const track = goal.category
-  const title = goal.kind === 'study' ? 'Хочу учиться' : goal.title
-  const summary = goal.kind === 'study' ? getStudySemesterProgress() : getIndustryProgressSummary(getIndustryProgress(goal))
-  const stageCount = goal.kind === 'study' ? summary.totalSemesters : industryStages.length
-  const completedCount = goal.kind === 'study' ? summary.completedSemesters : summary.completedStages
-
-  return `
-    <article class="saved-goal">
-      <header class="saved-goal__header">
-        <div class="saved-goal__meta">
-          <h3>${track}</h3>
-          <span class="badge badge--positive">${icon('check-verified.svg', 16)}${completedCount} из ${stageCount} ${goal.kind === 'study' ? 'семестров ' : ''}завершено</span>
-        </div>
-        <div class="saved-goal__actions">
-          ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
-          ${controlButton({ className: 'flat-button flat-button--neutral saved-goal__open', content: 'Открыть', attributes: `data-open-saved-goal="${goal.kind}" data-saved-goal-id="${goal.id}"` })}
-        </div>
-      </header>
-      <div class="saved-goal__body">
-        <h4>${title}</h4>
-        <strong>${summary.percent}%</strong>
-        <div class="saved-goal__progress" role="progressbar" aria-label="Прогресс цели «${title}»" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${summary.percent}">
-          <span style="width: ${summary.percent}%"></span>
+  const expanded = goal.id === getSavedGoalIds()[0]
+  const progress = getIndustryProgress(goal)
+  const panelId = `saved-goal-panel-${goal.id}`
+  return `<article class="saved-goal saved-goal--inline ${expanded ? 'saved-goal--expanded' : ''}" data-saved-goal="${goal.id}">
+    <header class="saved-goal__header">
+      <div class="saved-goal__copy">
+        <p class="saved-goal__track">${goal.category}</p>
+        <h3 id="saved-goal-title-${goal.id}">${goal.title}</h3>
+      </div>
+      <div class="saved-goal__actions">
+        ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: `data-delete-current-goal="${goal.id}"` })}
+        ${controlButton({ variant: 'flat-icon', className: 'saved-goal__toggle', attributes: `data-saved-goal-toggle aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} цель: ${escapeHTML(goal.title)}"`, content: `<span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
+      </div>
+    </header>
+    <div class="study-stage__panel saved-goal__panel" id="${panelId}" role="region" aria-labelledby="saved-goal-title-${goal.id}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
+      <div class="study-stage__panel-inner">
+        <div class="saved-goal__checklist">
+          ${industryStages.map((stage, index) => industryStageTemplate(stage, index, progress, goal)).join('')}
         </div>
       </div>
-    </article>`
+    </div>
+  </article>`
 }
 
 function myGoalsTemplate() {
@@ -3616,11 +3616,26 @@ root.addEventListener('click', (event) => {
     return
   }
 
-  const savedGoalButton = event.target.closest('[data-open-saved-goal]')
-  if (savedGoalButton?.dataset.openSavedGoal === 'study') renderScreen('study-goal')
-  if (savedGoalButton && savedGoalButton.dataset.openSavedGoal !== 'study') {
-    openedCareerGoalId = savedGoalButton.dataset.savedGoalId
-    renderScreen('industry-goal')
+  const savedGoalToggle = event.target.closest('[data-saved-goal-toggle]')
+  if (savedGoalToggle) {
+    const card = savedGoalToggle.closest('[data-saved-goal]')
+    const goal = goals.find((item) => item.id === card.dataset.savedGoal)
+    const expanded = savedGoalToggle.getAttribute('aria-expanded') !== 'true'
+    const panel = document.getElementById(savedGoalToggle.getAttribute('aria-controls'))
+    card.classList.toggle('saved-goal--expanded', expanded)
+    savedGoalToggle.setAttribute('aria-expanded', String(expanded))
+    savedGoalToggle.setAttribute('aria-label', `${expanded ? 'Свернуть' : 'Развернуть'} цель: ${goal.title}`)
+    panel.setAttribute('aria-hidden', String(!expanded))
+    panel.inert = !expanded
+    return
+  }
+
+  const inlineGoalAction = event.target.closest('[data-inline-goal-action]')
+  if (inlineGoalAction) {
+    const tab = root.querySelector(`[data-navigator-tabs] [data-study-tab="${inlineGoalAction.dataset.inlineGoalAction}"]`)
+    if (tab) activateStudyTab(tab, { focus: true })
+    if (inlineGoalAction.hasAttribute('data-inline-goal-application')) openApplicationDrawer()
+    return
   }
 
   const deleteCurrentGoal = event.target.closest('[data-delete-current-goal]')
@@ -4083,6 +4098,14 @@ document.addEventListener('click', (event) => {
 })
 
 root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-saved-goal-task]')) {
+    const card = event.target.closest('[data-saved-goal]')
+    const goal = goals.find((item) => item.id === card.dataset.savedGoal)
+    const checkedTasks = [...card.querySelectorAll('[data-saved-goal-task]:checked')].map((field) => field.value)
+    saveIndustryProgress(new Set(checkedTasks), goal)
+    return
+  }
+
   if (event.target.matches('[data-vacancy-application-consent]')) {
     event.target.closest('.vacancy-apply-consent')?.classList.remove('is-error')
     event.target.setAttribute('aria-invalid', 'false')

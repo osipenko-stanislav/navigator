@@ -1568,3 +1568,25 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .ui-select__options, .ui-multiselect__options { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
 
 .ui-date-picker { overflow-y: auto; overscroll-behavior: contain; }
+
+
+/* Career goals expose their checklists directly without completion metrics. */
+.navigator-goals-panel { padding: 0; background: transparent; }
+.navigator-goals-panel__header { margin-bottom: 4px; padding: 24px 32px; border-radius: 24px; background: var(--surface); }
+.navigator-goals-panel .saved-goals-list { gap: 4px; }
+.saved-goal--inline { padding: 0; }
+.saved-goal--inline > .saved-goal__header { align-items: flex-start; padding: 24px 32px; }
+.saved-goal__copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 8px; }
+.saved-goal__track { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 20px; }
+.saved-goal__copy h3 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
+.saved-goal--inline .saved-goal__actions { flex-wrap: nowrap; margin-right: -8px; }
+.saved-goal__toggle { width: 40px; height: 40px; padding: 4px; }
+.saved-goal--expanded > .saved-goal__header .study-stage__chevron-up { opacity: 1; transform: rotate(0); }
+.saved-goal--expanded > .saved-goal__header .study-stage__chevron-down { opacity: 0; transform: rotate(90deg); }
+.saved-goal--expanded > .saved-goal__panel { grid-template-rows: 1fr; opacity: 1; }
+.saved-goal__checklist { display: flex; flex-direction: column; gap: 4px; margin: 0 8px 8px; padding: 4px; border-radius: 20px; background: var(--surface-alt); }
+@media (max-width: 600px) {
+  .navigator-goals-panel__header { padding: 24px 20px; }
+  .saved-goal--inline > .saved-goal__header { gap: 8px; padding: 20px; }
+  .saved-goal--inline .saved-goal__actions { flex-direction: column-reverse; align-items: flex-end; }
+}

@@ -52,7 +52,7 @@
 - Allow one or two career goals, with no more than one goal per track: Industry, Science, Entrepreneurship. Study is available by default and is not a selectable career goal.
 - Keep the `+ Цель` button enabled at the two-goal limit. At the limit, clicking it must open a warning that one current goal needs to be deleted before adding another.
 - Render only goals the student has actually added; one saved goal produces one goal card, and two saved goals produce two cards.
-- Every newly added goal starts at `0%` and `0 / 5 этапов завершено`.
+- Saved career goals are separate expandable islands with inline checklists and chevron controls. Do not show progress bars, percentages, completion counters, or an Open action in these cards. New goals start with all tasks unchecked.
 - Career cards must display the selected goal’s actual track and maintain progress independently between tracks. Removing or adding career goals must not reset the separate study plan.
 - The Study goal opens `/study-goal/`. Its progress is derived from completed checklist tasks, and an entire stage counts as complete only when all of its tasks are checked.
 - Open the Study goal on its `Моя цель` tab by default; other tabs open only after an explicit tab selection.
