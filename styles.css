@@ -1619,3 +1619,13 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .goal-card__icon--profile .icon { filter: brightness(0) saturate(100%) invert(11%); }
 .portfolio-profile-card__content .portfolio-profile-card__materials { gap: 4px; }
 .portfolio-profile-card__content .portfolio-profile-card__footer { border-radius: 16px; background: var(--surface); }
+
+
+.saved-goal__header-actions { position: absolute; top: 24px; right: 72px; display: flex; align-items: center; gap: 4px; }
+.portfolio-profile-card--island .saved-goal__toggle .saved-goal__copy { padding-right: 208px; }
+@media (max-width: 600px) {
+  .saved-goal__header-actions { top: 56px; right: 20px; }
+  .portfolio-profile-card--island .saved-goal__toggle { padding-bottom: 72px; }
+  .portfolio-profile-card--island .saved-goal__toggle .saved-goal__copy { padding-right: 0; }
+  .portfolio-profile-card--island .saved-goal__header-actions { top: auto; right: 20px; bottom: 16px; }
+}

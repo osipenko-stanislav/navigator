@@ -2092,12 +2092,12 @@ function portfolioMaterialTemplate(label, linkLabel, link, file, kind, profileId
     </section>`
 }
 
-function expandableCardHeader({ title, titleId, panelId, meta, expanded, type, toggleAttributes, deleteAttributes, description = '' }) {
+function expandableCardHeader({ title, titleId, panelId, meta = '', expanded, type, toggleAttributes, deleteAttributes, description = '', actions = '' }) {
   return `<header class="saved-goal__header">
     <h3 class="saved-goal__heading">
       ${controlButton({ className: 'saved-goal__toggle', attributes: `data-island-toggle data-island-type="${type}" ${toggleAttributes} aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${type === 'profile' ? 'профиль' : 'цель'}: ${escapeHTML(title)}"`, content: `<span class="saved-goal__copy">${meta}<span class="saved-goal__title" id="${titleId}">${escapeHTML(title)}</span>${description ? `<span class="saved-goal__description">${escapeHTML(description)}</span>` : ''}</span><span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
     </h3>
-    ${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: deleteAttributes })}
+    <div class="saved-goal__header-actions">${actions}${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: deleteAttributes })}</div>
   </header>`
 }
 
@@ -2108,7 +2108,7 @@ function portfolioProfileCard(profile, index, profiles) {
   return `<article class="saved-goal saved-goal--inline portfolio-profile-card portfolio-profile-card--island ${expanded ? 'saved-goal--expanded' : ''}" data-expandable-island data-portfolio-card="${profile.id}">
     ${expandableCardHeader({
       title: profile.name, titleId, panelId, expanded, type: 'profile', description: profile.description,
-      meta: `<span class="goal-card__heading"><span class="goal-card__icon goal-card__icon--profile">${icon('portfolio-file.svg', 18)}</span><span class="goal-card__category">Профиль</span></span>`,
+      actions: controlButton({ variant: 'flat', content: 'Редактировать', attributes: `data-portfolio-edit="${profile.id}"` }),
       toggleAttributes: 'data-portfolio-toggle', deleteAttributes: `data-portfolio-delete="${profile.id}"`,
     })}
     <div class="study-stage__panel saved-goal__panel" id="${panelId}" role="region" aria-labelledby="${titleId}" aria-hidden="${!expanded}" ${expanded ? '' : 'inert'}>
@@ -2118,10 +2118,7 @@ function portfolioProfileCard(profile, index, profiles) {
             ${portfolioMaterialTemplate('Резюме', 'Ссылка на резюме', profile.resumeLink, profile.resumeFile, 'resume', profile.id)}
             ${portfolioMaterialTemplate('Портфолио', 'Ссылка на портфолио', profile.portfolioLink, profile.portfolioFile, 'portfolio', profile.id)}
           </div>
-          <footer class="portfolio-profile-card__footer">
-            ${profiles.length > 1 ? toggleControl({ className: 'portfolio-profile-card__primary', inputAttributes: `data-portfolio-primary="${profile.id}" ${profile.primary ? 'checked' : ''}`, label: 'Основной профиль' }) : ''}
-            <div class="portfolio-profile-card__actions">${controlButton({ className: 'flat-button flat-button--neutral', content: 'Редактировать', attributes: `data-portfolio-edit="${profile.id}"` })}</div>
-          </footer>
+          ${profiles.length > 1 ? `<footer class="portfolio-profile-card__footer">${toggleControl({ className: 'portfolio-profile-card__primary', inputAttributes: `data-portfolio-primary="${profile.id}" ${profile.primary ? 'checked' : ''}`, label: 'Основной профиль' })}</footer>` : ''}
         </div>
       </div>
     </div>
