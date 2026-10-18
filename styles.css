@@ -1545,3 +1545,11 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
   .navigator-landing__hero { padding-inline: 20px; }
   .navigator-goals-panel { padding: 24px 20px; }
 }
+
+
+.applications-onboarding { margin-top: 24px; }
+.applications-onboarding .portfolio-empty__copy { max-width: 480px; }
+.applications-onboarding__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+@media (max-width: 420px) {
+  .applications-onboarding__actions { width: 100%; flex-direction: column; }
+}

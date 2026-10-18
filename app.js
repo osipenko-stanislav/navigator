@@ -1983,6 +1983,18 @@ function formatApplicationDate(value) {
 }
 
 function applicationsTemplate() {
+  if (!applications.length) {
+    return `<section class="portfolio-empty applications-onboarding" aria-labelledby="applications-title">
+      <div class="portfolio-empty__copy">
+        <h2 id="applications-title">Здесь появятся твои отклики</h2>
+        <p>Когда ты откликнешься на вакансии или добавишь внешний отклик, все отклики будут жить здесь.</p>
+      </div>
+      <div class="applications-onboarding__actions">
+        ${controlButton({ className: 'flat-button flat-button--primary', content: 'Откликнуться', attributes: 'data-browse-vacancies' })}
+        ${controlButton({ variant: 'flat-outline', content: 'Внешний отклик', attributes: 'data-application-add' })}
+      </div>
+    </section>`
+  }
   const filterValues = {
     company: [...new Set(applications.map((item) => item.company))],
     status: APPLICATION_STATUSES,
@@ -3757,6 +3769,12 @@ root.addEventListener('click', (event) => {
     applicationFilterOpen = null
     applicationPage = 1
     renderApplicationsPanel({ focusSelector: '[data-application-filter-toggle="company"]' })
+    return
+  }
+
+  if (event.target.closest('[data-browse-vacancies]')) {
+    const tab = root.querySelector('[data-study-tab="vacancies"]')
+    if (tab) activateStudyTab(tab, { focus: true })
     return
   }
 
