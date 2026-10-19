@@ -11,7 +11,7 @@ const goals = [
   { id: 'promotion', category: 'Индустрия', title: 'Получить повышение по грейду и/или зарплате на текущем месте', kind: 'industry' },
   { id: 'freelance', category: 'Индустрия', title: 'Работать на фрилансе', kind: 'industry' },
   { id: 'science', category: 'Наука', title: 'Развиваться в науке и/или провести исследование совместно с ЦУ', kind: 'science' },
-  { id: 'business', category: 'Предпринимательство', title: 'Развиваться в роли предпринимателя и/или запустить свой проект', kind: 'business' },
+  { id: 'business', category: 'Бизнес', title: 'Развиваться в роли предпринимателя и/или запустить свой проект', kind: 'business' },
 ]
 
 const MAX_GOALS = 2
@@ -993,10 +993,8 @@ function invitationTemplate() {
         <section class="navigator-landing__hero" aria-labelledby="invitation-title">
           <div class="navigator-landing__intro">
             <h1 id="invitation-title" tabindex="-1">Навигатор</h1>
-            <h2 class="navigator-landing__lead">Планируй карьеру и учебу в одном месте</h2>
-            <p>Здесь можно поставить карьерную цель, откликаться на партнерские вакансии, вести трекер откликов и подбирать нужные курсы.</p>
+            <p>Ставь карьерные цели, собирай учебный план, находи вакансии<br class="navigator-landing__desktop-break"> и следи за откликами. Все в одном месте.</p>
           </div>
-          <img class="navigator-landing__art" src="${ASSET}goals-header-illustration.svg" width="389" height="300" alt="" aria-hidden="true">
           <div class="study-tabs navigator-landing__tabs" role="tablist" aria-label="Разделы навигатора" data-study-tabs data-navigator-tabs>
             <span class="study-tabs__indicator" aria-hidden="true"></span>
             ${[
@@ -1011,28 +1009,56 @@ function invitationTemplate() {
         </section>
 
         <div class="navigator-landing__about" id="study-panel-about" role="tabpanel" aria-labelledby="study-tab-about" data-study-panel="about">
-        <section class="navigator-landing__help" aria-labelledby="navigator-help-title">
+        <section class="navigator-landing__features" aria-labelledby="navigator-features-title">
+          <h2 id="navigator-features-title">Планируй карьеру и учебу<br>в одном месте</h2>
+          <div class="navigator-landing__feature-grid">
+            <article class="navigator-feature navigator-feature--goals">
+              <div class="navigator-feature__copy"><h3>Большие планы<br>начинаются с цели</h3><p>Выбери свои цели на учебный год<br class="navigator-landing__desktop-break"> в индустрии, науке или бизнесе</p></div>
+              <div class="navigator-feature__tracks" aria-hidden="true">${['building', 'microscope', 'luggage'].map((name) => `<span><img src="${ASSET}landing-${name}.svg" width="20" height="20" alt=""></span>`).join('')}</div>
+            </article>
+            <article class="navigator-feature navigator-feature--profile">
+              <div class="navigator-feature__copy"><h3>Один опыт. Разные<br>возможности</h3><p>Загружай резюме и портфолио<br>под разные вакансии</p></div>
+              <div class="navigator-feature__folder" aria-hidden="true"><img src="${ASSET}landing-folder.webp" width="200" height="120" alt=""></div>
+            </article>
+            <article class="navigator-feature navigator-feature--vacancies">
+              <div class="navigator-feature__copy"><h3>Возможности ближе,<br>чем кажется</h3><p>Находи работу и стажировки<br>у компаний-партнеров</p></div>
+              <div class="navigator-feature__rope" aria-hidden="true"><img src="${ASSET}landing-rope.webp" width="199" height="244" alt=""></div>
+            </article>
+            <article class="navigator-feature navigator-feature--apply">
+              <div class="navigator-feature__copy"><h3>Откликайся!</h3><p>Выбирай подходящий рабочий<br>профиль и отправляй отклик</p></div>
+              <div class="navigator-feature__enter" aria-hidden="true"><img src="${ASSET}landing-enter.webp" width="200" height="125" alt=""></div>
+            </article>
+            <article class="navigator-feature navigator-feature--applications">
+              <div class="navigator-feature__copy"><h3>В откликах порядок</h3><p>Управляй статусами и следи<br>за поиском работы</p></div>
+              <div class="navigator-feature__tracker" aria-hidden="true"><img src="${ASSET}landing-tracker.webp" width="182.554" height="188.582" alt=""></div>
+            </article>
+            <article class="navigator-feature navigator-feature--study">
+              <div class="navigator-feature__copy"><h3>Учись тому, что важно тебе</h3><p>Выбирай курсы и собирай учебный<br>план по семестрам</p></div>
+              <div class="navigator-feature__cap" aria-hidden="true"><img src="${ASSET}landing-cap.webp" width="265.654" height="203.156" alt=""></div>
+            </article>
+          </div>
+        </section>
+        <section class="navigator-landing__help" aria-label="Помощь по карьере">
           <div class="navigator-landing__help-copy">
             <h2 id="navigator-help-title">Если нужна помощь</h2>
             <p>Запишись на карьерную консультацию<br class="navigator-landing__desktop-break"> или задай общий вопрос по карьере.</p>
             <div class="navigator-landing__actions">
-              ${controlButton({ className: 'flat-button flat-button--primary', content: 'Хочу консультацию' })}
-              ${controlButton({ variant: 'flat-outline', content: 'Хочу задать общий вопрос' })}
+              ${controlButton({ variant: 'flat-outline', content: `<img src="${ASSET}landing-chat.svg" width="20" height="20" alt="">Хочу консультацию` })}
+              ${controlButton({ variant: 'flat-outline', content: 'Общий вопрос', attributes: 'data-navigator-question' })}
             </div>
           </div>
-          <div class="navigator-landing__mayak">
-            <h3>${icon('message-chat-square.svg', 20)}<span>Как задать общий вопрос</span></h3>
+          <div class="navigator-landing__mayak" id="navigator-question" tabindex="-1">
+            <h2>Как задать общий вопрос</h2>
             <p>Введи <span class="navigator-landing__command">/mayak</span> и выбери:</p>
-            <p class="navigator-landing__help-path">Учеба и карьера <span aria-hidden="true">→</span> Центр партнерств и карьеры <span aria-hidden="true">→</span> Навигация по карьерным возможностям</p>
+            <p class="navigator-landing__help-path">Учеба и карьера → Центр партнерств и карьеры →<br class="navigator-landing__desktop-break"> Навигация по карьерным возможностям</p>
           </div>
         </section>
-
         <section class="navigator-landing__goals" aria-labelledby="navigator-goals-title">
           <h2 id="navigator-goals-title">Как работают цели</h2>
           <ul class="navigator-landing__rules">
-            <li>${icon('compass.svg', 20)}<span>У тебя может быть по одной цели в каждом треке: индустрия, наука и предпринимательство</span></li>
-            <li>${icon('stars.svg', 20)}<span>Одна цель — всегда основная</span></li>
-            <li>${icon('edit.svg', 20)}<span>Ты можешь поменять цель в любой момент</span></li>
+            <li><img src="${ASSET}landing-compass.svg" width="28" height="28" alt=""><div><h3>Цели</h3><p>Выбирай до двух целей из трех направлений: индустрия, наука и бизнес</p></div></li>
+            <li><img src="${ASSET}landing-target.svg" width="28" height="28" alt=""><div><h3>Главное — в приоритете</h3><p>Одна из выбранных целей всегда основная. На ней будет главный фокус</p></div></li>
+            <li><img src="${ASSET}landing-edit.svg" width="28" height="28" alt=""><div><h3>Планы могут меняться</h3><p>Меняй цели и приоритеты в любой момент, если твои интересы изменились</p></div></li>
           </ul>
         </section>
         </div>
@@ -2110,8 +2136,9 @@ function portfolioMaterialTemplate(label, linkLabel, link, file, kind, profileId
 function expandableCardHeader({ title, titleId, panelId, meta = '', expanded, type, toggleAttributes, deleteAttributes, description = '', actions = '', extra = '' }) {
   return `<header class="saved-goal__header">
     <h3 class="saved-goal__heading">
-      ${controlButton({ className: 'saved-goal__toggle', attributes: `data-island-toggle data-island-type="${type}" ${toggleAttributes} aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${type === 'profile' ? 'профиль' : 'цель'}: ${escapeHTML(title)}"`, content: `<span class="saved-goal__copy">${meta}<span class="saved-goal__title" id="${titleId}">${escapeHTML(title)}</span>${description ? `<span class="saved-goal__description">${escapeHTML(description)}</span>` : ''}</span><span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
+      ${controlButton({ className: 'saved-goal__toggle', attributes: `data-island-toggle data-island-type="${type}" ${toggleAttributes} aria-expanded="${expanded}" aria-controls="${panelId}" aria-label="${expanded ? 'Свернуть' : 'Развернуть'} ${type === 'profile' ? 'профиль' : 'цель'}: ${escapeHTML(title)}"`, content: `<span class="saved-goal__copy">${meta}<span class="saved-goal__title" id="${titleId}">${escapeHTML(title)}</span></span><span class="study-stage__chevron" aria-hidden="true"><img class="study-stage__chevron-up" src="${ASSET}chevron-up.svg" width="18" height="18" alt=""><img class="study-stage__chevron-down" src="${ASSET}chevron-down.svg" width="18" height="18" alt=""></span>` })}
     </h3>
+    ${description ? `<p class="saved-goal__description">${escapeHTML(description)}</p>` : ''}
     ${extra ? `<div class="saved-goal__header-extra">${extra}</div>` : ''}
     <div class="saved-goal__header-actions">${actions}${controlButton({ variant: 'flat-destructive', className: 'saved-goal__delete', content: 'Удалить', attributes: deleteAttributes })}</div>
   </header>`
@@ -3434,6 +3461,10 @@ function closeCatalogFilters() {
 }
 
 root.addEventListener('click', (event) => {
+  if (event.target.closest('[data-navigator-question]')) {
+    document.getElementById('navigator-question')?.focus()
+    return
+  }
   const statisticsToggle = event.target.closest('[data-planner-statistics-toggle]')
   if (statisticsToggle) {
     const expanded = statisticsToggle.getAttribute('aria-expanded') !== 'true'
