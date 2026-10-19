@@ -15,20 +15,20 @@ const goals = [
 ]
 
 const MAX_GOALS = 2
-const SAVED_GOALS_KEY = 'cpk:selected-goals'
-const PRIMARY_GOAL_KEY = 'cpk:primary-goal'
-const PENDING_GOAL_KEY = 'cpk:pending-goal'
-const STUDY_PROGRESS_KEY = 'cpk:study-goal-progress'
-const INDUSTRY_PROGRESS_KEY = 'cpk:industry-goal-progress'
-const VACANCY_STATE_KEY = 'cpk:industry-vacancies'
-const APPLICATIONS_STORAGE_KEY = 'cpk:industry-applications'
-const PORTFOLIO_PROFILES_STORAGE_KEY = 'cpk:industry-portfolio-profiles'
-const GOAL_FORM_VALUES_KEY = 'cpk:goal-form-values'
+const SAVED_GOALS_KEY = 'cpk:v2:selected-goals'
+const PRIMARY_GOAL_KEY = 'cpk:v2:primary-goal'
+const PENDING_GOAL_KEY = 'cpk:v2:pending-goal'
+const STUDY_PROGRESS_KEY = 'cpk:v2:study-goal-progress'
+const INDUSTRY_PROGRESS_KEY = 'cpk:v2:industry-goal-progress'
+const VACANCY_STATE_KEY = 'cpk:v2:industry-vacancies'
+const APPLICATIONS_STORAGE_KEY = 'cpk:v2:industry-applications'
+const PORTFOLIO_PROFILES_STORAGE_KEY = 'cpk:v2:industry-portfolio-profiles'
+const GOAL_FORM_VALUES_KEY = 'cpk:v2:goal-form-values'
 const PORTFOLIO_PROFILE_TONES = ['sure-blue', 'sure-pink', 'optimistic-t-yellow', 'care-tiny', 'care-violet', 'expert-blue', 'expert-orange']
-const ONBOARDING_KEY = 'cpk:career-onboarding'
-const GOAL_SELECTION_KEY = 'cpk:goal-selection-draft'
+const ONBOARDING_KEY = 'cpk:v2:career-onboarding'
+const GOAL_SELECTION_KEY = 'cpk:v2:goal-selection-draft'
 const SHOW_GOAL_INFO_DIALOG = false
-const PLANNER_STORAGE_KEY = 'cpk:study-planner-autumn-2026'
+const PLANNER_STORAGE_KEY = 'cpk:v2:study-planner-autumn-2026'
 const CURRENT_SEMESTER = 3
 const CAREER_SALARY_OPTIONS = [
   'До 50 000', '50 000 – 75 000', '75 000 – 100 000', '100 000 – 150 000',
@@ -431,21 +431,7 @@ function createDefaultPlannerState() {
     collapsedSemesters: [1, 2, 4, 5, 6, 7, 8],
     collapsedCourseGroups: [],
     collapsedAvailableGroups: [],
-    semesters: {
-      1: [
-        { id: '3b76f260-d6eb-425f-9fd0-c0a20001e68d', completed: true, fixed: true },
-        { id: '79637cb7-566c-4c3f-9ae0-ec8f71dc3425', completed: true, fixed: true },
-        { id: '8cef3870-88b1-48ff-9158-78df7615fcd1', completed: true, fixed: false },
-        { id: 'c2de5c23-0a1c-4f82-9db2-664b1ceb2899', completed: true, fixed: false },
-      ],
-      2: [
-        { id: '6de6247d-d369-4e82-9ec2-1aa683903b53', completed: true, fixed: true },
-        { id: '2c591cab-1da2-4e9a-bbb4-af7ffc848732', completed: true, fixed: true },
-        { id: '1ae0ede3-5156-4453-8400-c0e5a7b37bb6', completed: true, fixed: true },
-        { id: 'b4bfeaf1-e139-461d-bcbf-e4172be754a6', completed: true, fixed: false },
-      ],
-      3: [], 4: [], 5: [], 6: [], 7: [], 8: [],
-    },
+    semesters: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [index + 1, []])),
   }
 }
 
@@ -453,8 +439,6 @@ function getPlannerState() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(PLANNER_STORAGE_KEY) || 'null')
     if (!saved?.semesters) return createDefaultPlannerState()
-    // Start the updated study plan with only past semesters filled, once per saved plan.
-    const keepUpcomingCourses = saved.schemaVersion >= 2
     return {
       schemaVersion: 2,
       hideCompletedSemesters: Boolean(saved.hideCompletedSemesters),
@@ -471,15 +455,10 @@ function getPlannerState() {
         : [],
       semesters: Object.fromEntries(Array.from({ length: 8 }, (_, index) => {
         const semester = index + 1
-        const courses = semester >= CURRENT_SEMESTER && !keepUpcomingCourses
-          ? []
-          : Array.isArray(saved.semesters[semester]) ? saved.semesters[semester] : []
-        const resolvedCourses = semester < CURRENT_SEMESTER && courses.length === 0
-          ? createDefaultPlannerState().semesters[semester]
-          : courses
-        return [semester, resolvedCourses
+        const courses = Array.isArray(saved.semesters[semester]) ? saved.semesters[semester] : []
+        return [semester, courses
           .filter((item) => plannerCourses.some((course) => course.id === item.id))
-          .map((item) => ({ ...item, completed: semester < CURRENT_SEMESTER || Boolean(item.completed) }))]
+          .map((item) => ({ ...item, completed: Boolean(item.completed) }))]
       })),
     }
   } catch {
@@ -576,6 +555,18 @@ function plannerSummary() {
   return { planned: planned.length, completed, percent }
 }
 
+function plannerTrackSummary(specialization) {
+  const courses = plannerCourses.filter((course) => course.specializations.includes(specialization))
+  const placements = new Map(Object.values(plannerState.semesters).flat().map((item) => [item.id, item]))
+  const totalLoad = courses.reduce((sum, course) => sum + course.workload, 0)
+  const completedLoad = courses.reduce((sum, course) => sum + (placements.get(course.id)?.completed ? course.workload : 0), 0)
+  const plannedLoad = courses.reduce((sum, course) => sum + (placements.has(course.id) && !placements.get(course.id).completed ? course.workload : 0), 0)
+  return {
+    earned: totalLoad ? Math.round(completedLoad / totalLoad * 100) : 0,
+    available: totalLoad ? Math.round(plannedLoad / totalLoad * 100) : 0,
+  }
+}
+
 function getStudySemesterProgress() {
   const totalSemesters = 8
   const completedSemesters = Array.from({ length: totalSemesters }, (_, index) => index + 1)
@@ -637,7 +628,7 @@ function getActiveCareerGoal() {
 }
 
 function careerProgressKey(goal) {
-  return goal?.kind && goal.kind !== 'industry' ? `cpk:${goal.kind}-goal-progress` : INDUSTRY_PROGRESS_KEY
+  return goal?.kind && goal.kind !== 'industry' ? `cpk:v2:${goal.kind}-goal-progress` : INDUSTRY_PROGRESS_KEY
 }
 
 function getIndustryProgress(goal = getActiveCareerGoal()) {
@@ -741,7 +732,7 @@ function commitGoalSelection() {
 }
 
 function resetGoalJourney() {
-  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, PRIMARY_GOAL_KEY, INDUSTRY_PROGRESS_KEY, 'cpk:science-goal-progress', 'cpk:business-goal-progress']
+  ;[GOAL_SELECTION_KEY, PENDING_GOAL_KEY, PRIMARY_GOAL_KEY, INDUSTRY_PROGRESS_KEY, 'cpk:v2:science-goal-progress', 'cpk:v2:business-goal-progress']
     .forEach((key) => window.localStorage.removeItem(key))
 }
 
@@ -1649,8 +1640,11 @@ function plannerTemplate() {
           <div class="planner-statistics__panel-inner">
             <div class="planner-overview" aria-label="Сводка учебного плана">
           ${[
-            ['Business', 25, 16], ['Software Engineering', 16, 32], ['AI', 52, 18],
-          ].map(([label, earned, available]) => `<div class="planner-track"><strong>${label}</strong><div class="planner-track__bar"><span style="width:${earned}%"></span><i style="width:${available}%"></i></div><dl><div><dt>Набрано</dt><dd>${earned}%</dd></div><div><dt>Можно набрать</dt><dd>${available}%</dd></div></dl></div>`).join('')}
+            ['Business', 'Бизнес и аналитика'], ['Software Engineering', 'Разработка'], ['AI', 'ИИ'],
+          ].map(([label, specialization]) => {
+            const { earned, available } = plannerTrackSummary(specialization)
+            return `<div class="planner-track"><strong>${label}</strong><div class="planner-track__bar"><span style="width:${earned}%"></span><i style="width:${available}%"></i></div><dl><div><dt>Набрано</dt><dd>${earned}%</dd></div><div><dt>Можно набрать</dt><dd>${available}%</dd></div></dl></div>`
+          }).join('')}
             </div>
           </div>
         </div>
@@ -3039,7 +3033,6 @@ function findPlannerItem(courseId) {
 }
 
 function isPlannerSemesterCompleted(semester) {
-  if (semester < CURRENT_SEMESTER) return true
   const items = plannerState.semesters[semester] || []
   return items.length > 0 && items.every((item) => item.completed)
 }
