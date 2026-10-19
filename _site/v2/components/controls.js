@@ -1,0 +1,289 @@
+function attributes(value = '') {
+  const normalized = value.trim()
+  return normalized ? ` ${normalized}` : ''
+}
+
+function escapeAttribute(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function formatDateValue(value = '') {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const [year, month, day] = value.split('-')
+  return `${day}.${month}.${year.slice(-2)}`
+}
+
+export function controlButton({ content, className = '', variant = '', size = '', type = 'button', href = '', target = '', attributes: extraAttributes = '' }) {
+  const variantClasses = {
+    flat: 'flat-button flat-button--neutral',
+    'flat-outline': 'flat-button flat-button--outline',
+    'flat-destructive': 'flat-button flat-button--destructive',
+    'flat-icon': 'flat-button flat-button--neutral ui-button-icon',
+    'flat-icon-destructive': 'flat-button flat-button--destructive ui-button-icon',
+    'context-trigger': 'ui-context-trigger',
+  }
+  const classes = [...new Set(`${variantClasses[variant] || ''} ${size === 'compact' ? 'ui-button--compact' : ''} ${className}`.trim().split(/\s+/))].filter(Boolean).join(' ')
+  const classAttribute = classes ? ` class="${classes}"` : ''
+  if (href) {
+    const targetAttribute = target ? ` target="${escapeAttribute(target)}"` : ''
+    const relAttribute = target === '_blank' ? ' rel="noopener noreferrer"' : ''
+    return `<a${classAttribute} href="${escapeAttribute(href)}"${targetAttribute}${relAttribute}${attributes(extraAttributes)}>${content}</a>`
+  }
+  return `<button${classAttribute} type="${type}"${attributes(extraAttributes)}>${content}</button>`
+}
+
+export function linkControl({ href, label, className = '', attributes: extraAttributes = '' }) {
+  return `<a href="${escapeAttribute(href)}"${className ? ` class="${escapeAttribute(className)}"` : ''}${attributes(extraAttributes)}>${escapeAttribute(label)}</a>`
+}
+
+export function contextMenuControl({ id, label, items }) {
+  return `<div class="ui-context-menu" id="${id}" role="menu" aria-label="${escapeAttribute(label)}">
+    ${items.map((item) => item.separator
+      ? '<div class="ui-context-menu__divider" role="separator"></div>'
+      : controlButton({
+        className: `ui-context-menu__item${item.destructive ? ' ui-context-menu__item--destructive' : ''}`,
+        content: `${item.iconContent || ''}<span>${escapeAttribute(item.label)}</span>${item.trailingContent || ''}`,
+        attributes: `role="menuitem" tabindex="-1"${item.disabled ? ' disabled' : ''}${attributes(item.attributes || '')}`,
+      })).join('')}
+  </div>`
+}
+
+export function checkboxControl({
+  className = '',
+  inputAttributes = '',
+  boxContent = '',
+  content = '',
+}) {
+  const classes = ['ui-checkbox', className].filter(Boolean).join(' ')
+
+  return `
+    <label class="${classes}">
+      <span class="ui-checkbox__control">
+        <input class="ui-checkbox__input" type="checkbox"${attributes(inputAttributes)}>
+        <span class="ui-checkbox__box" aria-hidden="true">${boxContent}</span>
+      </span>
+      ${content}
+    </label>`
+}
+
+export function toggleControl({ className = '', inputAttributes = '', label }) {
+  const classes = ['ui-toggle', className].filter(Boolean).join(' ')
+
+  return `
+    <label class="${classes}">
+      <input class="ui-toggle__input" type="checkbox"${attributes(inputAttributes)}>
+      <span class="ui-toggle__track" aria-hidden="true"><span></span></span>
+      <span class="ui-toggle__label">${label}</span>
+    </label>`
+}
+
+export function chipControl({ label, selected = false, attributes: extraAttributes = '' }) {
+  return controlButton({
+    className: `ui-chip-filled ${selected ? 'is-selected' : ''}`.trim(),
+    content: `<span>${label}</span>`,
+    attributes: `aria-pressed="${selected}"${attributes(extraAttributes)}`,
+  })
+}
+
+export function fieldControl({ id, label, placeholder, options, multiple = false, checkContent = '', required = true, errorMessage, inputAttributes = '', value = '', className = '', leadingContent = '', hideLabel = false, type = 'text', multiline = false, toolbarContent = '', dateIconContent = '', clearIconContent = '' }) {
+  const validation = required ? ' required' : ''
+  const error = errorMessage || 'Заполни поле'
+  const extraAttributes = attributes(inputAttributes)
+  const disabled = /(^|\s)disabled(\s|$)/.test(inputAttributes)
+  const classes = ['ui-field', className].filter(Boolean).join(' ')
+  const safeValue = escapeAttribute(value)
+  const normalizedOptions = options?.map((option) => typeof option === 'object'
+    ? { value: String(option.value), label: String(option.label) }
+    : { value: String(option), label: String(option) })
+
+  if (type === 'date') {
+    const displayValue = formatDateValue(value)
+    return `
+      <div class="${classes}" data-ui-date="${id}">
+        <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
+        <span class="ui-field__control ui-field__control--date">
+          <input id="${id}" name="${id}" type="hidden" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
+          ${controlButton({
+            className: 'ui-date__value',
+            content: `<span class="${displayValue ? '' : 'is-placeholder'}" data-ui-date-value>${displayValue || placeholder}</span>`,
+            attributes: `aria-labelledby="${id}-label" aria-expanded="false" aria-controls="${id}-picker" data-ui-date-toggle="${id}"${disabled ? ' disabled' : ''}`,
+          })}
+          ${controlButton({
+            className: 'ui-date__clear',
+            content: clearIconContent,
+            attributes: `aria-label="Очистить дату" data-ui-date-clear="${id}"${displayValue && !disabled ? '' : ' hidden'}${disabled ? ' disabled' : ''}`,
+          })}
+          ${controlButton({
+            className: 'ui-date__calendar',
+            content: dateIconContent,
+            attributes: `aria-label="Открыть календарь" aria-expanded="false" aria-controls="${id}-picker" data-ui-date-toggle="${id}"${disabled ? ' disabled' : ''}`,
+          })}
+          <span class="ui-date-picker" id="${id}-picker" role="dialog" aria-label="Выбор даты" hidden></span>
+        </span>
+        <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+      </div>`
+  }
+
+  if (options) {
+    const selectedValues = new Set(multiple ? (Array.isArray(value) ? value : value ? [String(value)] : []) : [String(value)])
+    const displayValue = normalizedOptions.filter((option) => selectedValues.has(option.value)).map((option) => option.label).join(', ')
+    return `
+      <div class="${classes}" data-ui-select="${id}">
+        <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
+        <span class="ui-field__control ui-field__control--select">
+          <select class="visually-hidden" id="${id}" name="${id}" data-ui-field${multiple ? ' multiple' : ''}${validation}${extraAttributes} tabindex="-1" aria-hidden="true">
+            ${multiple ? '' : `<option value="" ${value ? '' : 'selected'} disabled>${placeholder}</option>`}
+            ${normalizedOptions.map((option) => `<option value="${escapeAttribute(option.value)}" ${selectedValues.has(option.value) ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`).join('')}
+          </select>
+          ${controlButton({
+            className: 'ui-select__trigger',
+            content: `<span class="${displayValue ? '' : 'is-placeholder'}">${escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
+            attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger"${multiple ? '' : ' aria-haspopup="listbox"'} aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}" data-placeholder="${escapeAttribute(placeholder)}"${disabled ? ' disabled' : ''}`,
+          })}
+          <span class="ui-select__options" id="${id}-options" role="${multiple ? 'group' : 'listbox'}" aria-labelledby="${id}-label" hidden>
+            ${normalizedOptions.map((option) => multiple ? checkboxControl({
+              className: `ui-select__option ui-select__option--multiple ${selectedValues.has(option.value) ? 'is-selected' : ''}`,
+              inputAttributes: `data-ui-select-checkbox="${id}" value="${escapeAttribute(option.value)}"${selectedValues.has(option.value) ? ' checked' : ''}${disabled ? ' disabled' : ''}`,
+              boxContent: checkContent,
+              content: `<span>${escapeAttribute(option.label)}</span>`,
+            }) : controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
+          </span>
+        </span>
+        <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+      </div>`
+  }
+
+  if (multiline) {
+    return `
+      <label class="${classes}" for="${id}">
+        <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}">${label}</span>
+        <span class="ui-field__control ui-field__control--textarea ${toolbarContent ? 'ui-field__control--with-toolbar' : ''}">
+          ${toolbarContent ? `<span class="ui-field__toolbar">${toolbarContent}</span>` : ''}
+          <textarea id="${id}" name="${id}" placeholder="${placeholder}" data-ui-field${validation}${extraAttributes}>${safeValue}</textarea>
+        </span>
+        <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+      </label>`
+  }
+
+  return `
+    <label class="${classes}" for="${id}">
+      <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}">${label}</span>
+      <span class="ui-field__control">
+        ${leadingContent}
+        <input id="${id}" name="${id}" type="${type}" placeholder="${placeholder}" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
+      </span>
+      <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
+    </label>`
+}
+
+export function fileControl({ id, label, file = null, inputAttributes = '', checkContent = '', clearContent = '' }) {
+  const fileName = file?.name ? escapeAttribute(file.name) : ''
+
+  return `
+    <div class="ui-file-field" data-file-control="${id}">
+      <span class="ui-field__label" id="${id}-label">${label}</span>
+      <label class="ui-file-field__drop" for="${id}" data-file-drop="${id}">
+        <input class="visually-hidden" id="${id}" name="${id}" type="file" accept=".jpg,.jpeg,.png,.pdf" aria-labelledby="${id}-label ${id}-prompt" data-profile-file="${id}"${attributes(inputAttributes)}>
+        <span id="${id}-prompt">Выбери файл или перетяни их сюда</span>
+      </label>
+      <div class="ui-file-field__selected" data-file-selected="${id}" ${fileName ? '' : 'hidden'}>
+        <span class="ui-file-field__status" aria-hidden="true">${checkContent}</span>
+        <span class="ui-file-field__name" data-file-name>${fileName}</span>
+        ${controlButton({ className: 'ui-file-field__clear', content: clearContent, attributes: `aria-label="Удалить файл" data-file-clear="${id}"` })}
+      </div>
+      <span class="ui-file-field__helper">Файлы форматов jpg, png и pdf, не более 5 МБ</span>
+      <span class="ui-field__error" id="${id}-error" aria-live="polite"></span>
+    </div>`
+}
+
+export function tabControl({ id, label, active = false, namespace = 'study' }) {
+  return controlButton({
+    className: `study-tabs__tab ${active ? 'is-active' : ''}`.trim(),
+    content: `<span>${label}</span>`,
+    attributes: `role="tab" id="${namespace}-tab-${id}" aria-controls="${namespace}-panel-${id}" aria-selected="${active}" tabindex="${active ? '0' : '-1'}" data-${namespace}-tab="${id}"`,
+  })
+}
+
+export function multiSelectControl({ id, label, placeholder, options, selected = new Set(), open = false, checkContent = '', attributes: extraAttributes = '' }) {
+  const selectedLabels = options.filter((option) => selected.has(option.value)).map((option) => option.label)
+  const value = selectedLabels.length ? `${label}: ${selectedLabels.join(', ')}` : placeholder
+
+  return `
+    <div class="ui-multiselect ${open ? 'is-open' : ''}" data-ui-multiselect="${id}">
+      <span class="ui-field__label">${label}</span>
+      ${controlButton({
+        className: 'ui-multiselect__trigger',
+        content: `<span class="${selectedLabels.length ? '' : 'is-placeholder'}">${value}</span><span class="ui-multiselect__chevron" aria-hidden="true"></span>`,
+        attributes: `aria-expanded="${open}" aria-controls="${id}-options"${attributes(extraAttributes)}`,
+      })}
+      <div class="ui-multiselect__options" id="${id}-options" ${open ? '' : 'hidden'}>
+        ${options.map((option) => checkboxControl({
+          className: 'ui-multiselect__option',
+          inputAttributes: `value="${escapeAttribute(option.value)}" ${selected.has(option.value) ? 'checked' : ''} data-ui-multiselect-option="${id}"`,
+          boxContent: checkContent,
+          content: `<span>${option.label}</span>`,
+        })).join('')}
+      </div>
+    </div>`
+}
+
+
+export function positionDropdown(field) {
+  const menu = field.querySelector('.ui-select__options, .ui-multiselect__options, .ui-date-picker')
+  const trigger = field.querySelector('.ui-select__trigger, .ui-multiselect__trigger, .ui-field__control--date')
+  if (!menu || menu.hidden || !trigger || !trigger.getClientRects().length) return
+
+  // Measure from the component's default geometry on every opening or viewport change.
+  for (const property of ['top', 'bottom', 'left', 'max-height', 'max-width']) menu.style.removeProperty(property)
+  const viewport = window.visualViewport
+  const margin = 12
+  const gap = 4
+  const bounds = {
+    top: (viewport?.offsetTop || 0) + margin,
+    bottom: (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight) - margin,
+    left: (viewport?.offsetLeft || 0) + margin,
+    right: (viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) - margin,
+  }
+
+  // Drawers and other scrolling surfaces can clip a menu before the viewport does.
+  for (let parent = menu.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+    const style = getComputedStyle(parent)
+    const rect = parent.getBoundingClientRect()
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+      bounds.top = Math.max(bounds.top, rect.top + parent.clientTop)
+      bounds.bottom = Math.min(bounds.bottom, rect.top + parent.clientTop + parent.clientHeight)
+    }
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) {
+      bounds.left = Math.max(bounds.left, rect.left + parent.clientLeft)
+      bounds.right = Math.min(bounds.right, rect.left + parent.clientLeft + parent.clientWidth)
+    }
+  }
+
+  const styles = getComputedStyle(menu)
+  const heightLimit = Number.parseFloat(styles.maxHeight) || Infinity
+  const widthLimit = Number.parseFloat(styles.maxWidth) || Infinity
+  menu.style.maxWidth = `${Math.min(widthLimit, Math.max(0, bounds.right - bounds.left))}px`
+  const anchor = trigger.getBoundingClientRect()
+  const desiredHeight = Math.min(menu.scrollHeight + menu.offsetHeight - menu.clientHeight, heightLimit)
+  const below = Math.max(0, bounds.bottom - anchor.bottom - gap)
+  const above = Math.max(0, anchor.top - bounds.top - gap)
+  const openAbove = below < desiredHeight && (above >= desiredHeight || above > below)
+  menu.style.maxHeight = `${Math.min(heightLimit, openAbove ? above : below)}px`
+  menu.dataset.dropdownPlacement = openAbove ? 'top' : 'bottom'
+
+  const parent = menu.offsetParent
+  if (!parent) return
+  const parentRect = parent.getBoundingClientRect()
+  const top = openAbove ? anchor.top - gap - menu.offsetHeight : anchor.bottom + gap
+  menu.style.top = `${top - parentRect.top - parent.clientTop + parent.scrollTop}px`
+  menu.style.bottom = 'auto'
+
+  const rect = menu.getBoundingClientRect()
+  const shift = rect.right > bounds.right ? bounds.right - rect.right
+    : rect.left < bounds.left ? bounds.left - rect.left : 0
+  if (shift) menu.style.left = `${rect.left + shift - parentRect.left - parent.clientLeft + parent.scrollLeft}px`
+}
