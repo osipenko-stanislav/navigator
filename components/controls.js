@@ -200,11 +200,11 @@ export function fileControl({ id, label, file = null, inputAttributes = '', chec
     </div>`
 }
 
-export function tabControl({ id, label, active = false }) {
+export function tabControl({ id, label, active = false, namespace = 'study' }) {
   return controlButton({
     className: `study-tabs__tab ${active ? 'is-active' : ''}`.trim(),
     content: `<span>${label}</span>`,
-    attributes: `role="tab" id="study-tab-${id}" aria-controls="study-panel-${id}" aria-selected="${active}" tabindex="${active ? '0' : '-1'}" data-study-tab="${id}"`,
+    attributes: `role="tab" id="${namespace}-tab-${id}" aria-controls="${namespace}-panel-${id}" aria-selected="${active}" tabindex="${active ? '0' : '-1'}" data-${namespace}-tab="${id}"`,
   })
 }
 

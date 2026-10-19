@@ -1,4 +1,4 @@
-import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=27'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=28'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 
 const APP_ROOT_URL = new URL('./', import.meta.url)
@@ -487,6 +487,7 @@ function getPlannerState() {
   }
 }
 
+let plannerView = 'semesters'
 let plannerState = getPlannerState()
 savePlannerState()
 let pointerPlannerDrag = null
@@ -1631,15 +1632,20 @@ function plannerSemesterTemplate(semester) {
 }
 
 function plannerTemplate() {
-  const statisticsExpanded = !plannerState.statisticsCollapsed
+  const withTabs = getScreenFromLocation() === 'goals'
+  const statisticsExpanded = withTabs || !plannerState.statisticsCollapsed
   const semesterProgress = getStudySemesterProgress()
   return `
-    <section class="planner" aria-labelledby="planner-title">
+    <section class="planner ${withTabs ? 'planner--tabs' : ''}" aria-labelledby="planner-title">
       <h2 class="visually-hidden" id="planner-title">Учебный план</h2>
       <p class="visually-hidden" id="planner-drag-instructions">Перетащи курс за основную область карточки в другой семестр. Для доступного курса перетаскивание добавит его в семестр. С клавиатуры используй Alt и клавиши со стрелками.</p>
-      <section class="planner-statistics ${statisticsExpanded ? 'planner-statistics--expanded' : ''}" aria-labelledby="planner-statistics-title">
-        <header class="planner-statistics__header"><h3 id="planner-statistics-title">${controlButton({ className: 'planner-statistics__toggle', content: `<span>Статистика</span>${icon('chevron-down.svg', 18)}`, attributes: `data-planner-statistics-toggle aria-expanded="${statisticsExpanded}" aria-controls="planner-statistics-panel"` })}</h3></header>
-        <div class="planner-statistics__panel" id="planner-statistics-panel" aria-hidden="${!statisticsExpanded}" ${statisticsExpanded ? '' : 'inert'}>
+      <section class="planner-statistics ${statisticsExpanded ? 'planner-statistics--expanded' : ''} ${withTabs ? 'planner-statistics--tabs' : ''}" aria-label="Разделы учебного плана">
+        <header class="planner-statistics__header">${withTabs ? `
+          <div class="study-tabs planner-view-tabs" role="tablist" aria-label="Разделы учебного плана" data-planner-view-tabs>
+            <span class="study-tabs__indicator" aria-hidden="true"></span>
+            ${[['semesters', 'Семестры'], ['catalog', 'Все курсы'], ['glossary', 'Глоссарий']].map(([id, label]) => tabControl({ id, label, active: plannerView === id, namespace: 'planner-view' })).join('')}
+          </div>` : `<h3 id="planner-statistics-title">${controlButton({ className: 'planner-statistics__toggle', content: `<span>Статистика</span>${icon('chevron-down.svg', 18)}`, attributes: `data-planner-statistics-toggle aria-expanded="${statisticsExpanded}" aria-controls="planner-statistics-panel"` })}</h3>`}</header>
+        <div class="planner-statistics__panel" id="planner-statistics-panel" aria-hidden="${withTabs ? plannerView !== 'semesters' : !statisticsExpanded}" ${withTabs ? `data-planner-metrics ${plannerView === 'semesters' ? '' : 'hidden inert'}` : statisticsExpanded ? '' : 'inert'}>
           <div class="planner-statistics__panel-inner">
             <div class="planner-overview" aria-label="Сводка учебного плана">
           ${[
@@ -1649,7 +1655,7 @@ function plannerTemplate() {
           </div>
         </div>
       </section>
-      <div class="planner-semesters-group">
+      <div class="planner-semesters-group" ${withTabs ? `id="planner-view-panel-semesters" role="tabpanel" aria-labelledby="planner-view-tab-semesters" data-planner-view-panel="semesters" ${plannerView === 'semesters' ? '' : 'hidden'}` : ''}>
         <div class="planner-semesters-heading">
           <div class="planner-semesters-heading__title">
             <h3>Семестры</h3>
@@ -1664,6 +1670,9 @@ function plannerTemplate() {
           ${Array.from({ length: 8 }, (_, index) => plannerSemesterTemplate(index + 1)).join('')}
         </div>
       </div>
+      ${withTabs ? `
+        <div id="planner-view-panel-catalog" role="tabpanel" aria-labelledby="planner-view-tab-catalog" data-planner-view-panel="catalog" ${plannerView === 'catalog' ? '' : 'hidden'}>${catalogTemplate()}</div>
+        <div id="planner-view-panel-glossary" role="tabpanel" aria-labelledby="planner-view-tab-glossary" data-planner-view-panel="glossary" ${plannerView === 'glossary' ? '' : 'hidden'}>${glossaryTemplate()}</div>` : ''}
     </section>`
 }
 
@@ -2557,7 +2566,7 @@ function getScreenUrl(screen) {
 
 function syncStudyTabIndicator(tablist, { animate = true } = {}) {
   if (!tablist) return
-  const activeTab = tablist.querySelector('[data-study-tab].is-active')
+  const activeTab = tablist.querySelector('[role="tab"].is-active')
   const indicator = tablist.querySelector('.study-tabs__indicator')
   if (!activeTab || !indicator) return
 
@@ -2576,6 +2585,7 @@ function initializeCurrentScreen() {
     requestedStudyTab = null
   }
   if (tablist) syncStudyTabIndicator(tablist, { animate: false })
+  syncStudyTabIndicator(root.querySelector('[data-planner-view-tabs]'), { animate: false })
   if (requestedIndustryAction === 'add-application'
     && getScreenFromLocation() === 'industry-goal'
     && root.querySelector('[data-study-tab="applications"].is-active')) {
@@ -2747,6 +2757,7 @@ function renderPlannerPanel({ focusSelector } = {}) {
   const panel = root.querySelector('[data-study-panel="planner"]')
   if (!panel) return
   panel.innerHTML = plannerTemplate()
+  syncStudyTabIndicator(panel.querySelector('[data-planner-view-tabs]'), { animate: false })
   if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
 }
 
@@ -2763,7 +2774,7 @@ function renderPlannerDropResult(courseId, semester) {
 }
 
 function renderCatalogPanel({ focusSelector } = {}) {
-  const panel = root.querySelector('[data-study-panel="catalog"]')
+  const panel = root.querySelector('[data-planner-view-panel="catalog"], [data-study-panel="catalog"]')
   if (!panel) return
   panel.innerHTML = catalogTemplate()
   if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true })
@@ -3238,6 +3249,33 @@ function resetPlanner({ semester = null, keepCompleted = true } = {}) {
   savePlannerState()
 }
 
+function activatePlannerViewTab(tab, { focus = false } = {}) {
+  const planner = tab.closest('.planner')
+  const tablist = tab.closest('[data-planner-view-tabs]')
+  closePlannerCourseMenu()
+  closePlannerAvailableFilters()
+  closeCatalogFilters()
+  plannerView = tab.dataset.plannerViewTab
+  tablist.querySelectorAll('[data-planner-view-tab]').forEach((item) => {
+    const active = item === tab
+    item.classList.toggle('is-active', active)
+    item.setAttribute('aria-selected', String(active))
+    item.tabIndex = active ? 0 : -1
+  })
+  planner.querySelectorAll('[data-planner-view-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.plannerViewPanel !== plannerView
+  })
+  const metrics = planner.querySelector('[data-planner-metrics]')
+  metrics.hidden = plannerView !== 'semesters'
+  metrics.inert = metrics.hidden
+  metrics.setAttribute('aria-hidden', String(metrics.hidden))
+  syncStudyTabIndicator(tablist)
+  if (focus) {
+    tab.focus({ preventScroll: true })
+    tab.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+}
+
 function activateStudyTab(tab, { focus = false, updateHistory = true } = {}) {
   const tablist = tab.closest('[data-study-tabs]')
   closePlannerCourseMenu()
@@ -3254,6 +3292,7 @@ function activateStudyTab(tab, { focus = false, updateHistory = true } = {}) {
     panel.hidden = panel.dataset.studyPanel !== target
   })
   syncStudyTabIndicator(tablist)
+  if (target === 'planner') syncStudyTabIndicator(root.querySelector('[data-planner-view-tabs]'), { animate: false })
   if (updateHistory && tablist.hasAttribute('data-navigator-tabs')) {
     const url = new URL(window.location.href)
     if (target === 'about') url.searchParams.delete('tab')
@@ -3717,6 +3756,12 @@ root.addEventListener('click', (event) => {
       // Keep navigation available even when storage is unavailable.
     }
     closeDialog(() => renderScreen(getSavedGoals().length ? 'my-goals' : 'goals'))
+    return
+  }
+
+  const plannerViewTab = event.target.closest('[data-planner-view-tab]')
+  if (plannerViewTab) {
+    activatePlannerViewTab(plannerViewTab)
     return
   }
 
@@ -4833,21 +4878,23 @@ root.addEventListener('keydown', (event) => {
     return
   }
 
-  const tab = event.target.closest('[data-study-tab]')
+  const tab = event.target.closest('[data-study-tab], [data-planner-view-tab]')
   if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
 
   event.preventDefault()
-  const tabs = [...tab.closest('[data-study-tabs]').querySelectorAll('[data-study-tab]')]
+  const tablist = tab.closest('[role="tablist"]')
+  const tabs = [...tablist.querySelectorAll('[role="tab"]')]
   const currentIndex = tabs.indexOf(tab)
   let nextIndex = currentIndex
   if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
   if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
   if (event.key === 'Home') nextIndex = 0
   if (event.key === 'End') nextIndex = tabs.length - 1
-  activateStudyTab(tabs[nextIndex], { focus: true })
+  if (tab.hasAttribute('data-planner-view-tab')) activatePlannerViewTab(tabs[nextIndex], { focus: true })
+  else activateStudyTab(tabs[nextIndex], { focus: true })
 })
 
-window.addEventListener('resize', () => syncStudyTabIndicator(root.querySelector('[data-study-tabs]'), { animate: false }))
+window.addEventListener('resize', () => root.querySelectorAll('[data-study-tabs], [data-planner-view-tabs]').forEach((tablist) => syncStudyTabIndicator(tablist, { animate: false })))
 window.addEventListener('resize', () => closePlannerCourseMenu())
 document.addEventListener('scroll', (event) => {
   if (plannerCourseMenu && !event.target.closest?.('#planner-course-menu')) closePlannerCourseMenu()

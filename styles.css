@@ -884,6 +884,13 @@ a.industry-task__action:focus-visible { outline: 3px solid rgb(95 48 247 / 35%);
   .planner-statistics__panel, .planner-statistics__toggle .icon { transition: none; }
 }
 .planner-overview { margin: 0; border-radius: 20px; }
+.planner.planner--tabs { padding: 0; }
+.planner-statistics--tabs > .planner-statistics__header { padding: 16px 24px; }
+.planner [data-planner-view-panel] > :first-child { margin-top: 0; }
+.planner [data-planner-view-panel][hidden], .planner [data-planner-metrics][hidden] { display: none; }
+@media (max-width: 600px) {
+  .planner-statistics--tabs > .planner-statistics__header { padding: 12px 8px; }
+}
 .planner-track { padding: 16px 20px; }
 .planner-semesters-heading { min-height: 80px; margin: 0; padding: 20px 32px; border-radius: 24px; background: var(--surface); }
 .planner-semesters-heading__title { display: flex; min-width: 0; align-items: center; gap: 8px; }
