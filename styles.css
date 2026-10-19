@@ -1479,7 +1479,8 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 
 
 /* Navigator landing, composed within the persistent navigation shell. */
-.navigator-landing, .navigator-landing__about { display: flex; flex-direction: column; gap: 8px; }
+.navigator-landing { display: flex; flex-direction: column; gap: 24px; }
+.navigator-landing__about { display: flex; flex-direction: column; gap: 8px; }
 .navigator-landing__hero :is(h1, p), .navigator-landing__about :is(h2, h3, p) { margin: 0; }
 .navigator-landing__hero { display: flex; flex-direction: column; gap: 16px; padding: 24px 32px; border-radius: var(--radius-xl); background: var(--surface); }
 .navigator-landing__intro h1 { margin-bottom: 8px; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -.5px; }
@@ -1549,6 +1550,7 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 }
 
 .navigator-landing > [data-study-panel] { min-width: 0; }
+.navigator-landing > [data-study-panel] > :first-child { margin-top: 0; }
 .navigator-landing > [data-study-panel][hidden] { display: none; }
 .navigator-goals-panel { padding: 24px 32px 32px; border-radius: var(--radius-xl); background: var(--surface); }
 .navigator-goals-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
