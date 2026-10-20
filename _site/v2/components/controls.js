@@ -11,7 +11,11 @@ function escapeAttribute(value = '') {
     .replaceAll('>', '&gt;')
 }
 
-function formatDateValue(value = '') {
+export function formatDateValue(value = '', precision = 'day') {
+  if (precision === 'month') {
+    const match = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(value)
+    return match ? `${match[2]}.${match[1]}` : value
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   const [year, month, day] = value.split('-')
   return `${day}.${month}.${year.slice(-2)}`
@@ -97,16 +101,18 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
   const classes = ['ui-field', className].filter(Boolean).join(' ')
   const safeValue = escapeAttribute(value)
   const normalizedOptions = options?.map((option) => typeof option === 'object'
-    ? { value: String(option.value), label: String(option.label) }
+    ? { value: String(option.value), label: String(option.label), content: option.content }
     : { value: String(option), label: String(option) })
 
-  if (type === 'date') {
-    const displayValue = formatDateValue(value)
+  if (type === 'date' || type === 'month') {
+    const precision = type === 'month' ? 'month' : 'day'
+    const dateValue = type === 'month' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0, 7) : value
+    const displayValue = formatDateValue(dateValue, precision)
     return `
-      <div class="${classes}" data-ui-date="${id}">
+      <div class="${classes}" data-ui-date="${id}" data-ui-date-precision="${precision}">
         <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
         <span class="ui-field__control ui-field__control--date">
-          <input id="${id}" name="${id}" type="hidden" value="${safeValue}" data-ui-field${validation}${extraAttributes}>
+          <input id="${id}" name="${id}" type="hidden" value="${escapeAttribute(dateValue)}" data-ui-field${validation}${extraAttributes}>
           ${controlButton({
             className: 'ui-date__value',
             content: `<span class="${displayValue ? '' : 'is-placeholder'}" data-ui-date-value>${displayValue || placeholder}</span>`,
@@ -122,7 +128,7 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
             content: dateIconContent,
             attributes: `aria-label="Открыть календарь" aria-expanded="false" aria-controls="${id}-picker" data-ui-date-toggle="${id}"${disabled ? ' disabled' : ''}`,
           })}
-          <span class="ui-date-picker" id="${id}-picker" role="dialog" aria-label="Выбор даты" hidden></span>
+          <span class="ui-date-picker" id="${id}-picker" role="dialog" aria-label="${type === 'month' ? 'Выбор месяца и года' : 'Выбор даты'}" hidden></span>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
       </div>`
@@ -131,6 +137,7 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
   if (options) {
     const selectedValues = new Set(multiple ? (Array.isArray(value) ? value : value ? [String(value)] : []) : [String(value)])
     const displayValue = normalizedOptions.filter((option) => selectedValues.has(option.value)).map((option) => option.label).join(', ')
+    const selectedContent = !multiple && normalizedOptions.find((option) => selectedValues.has(option.value))?.content
     return `
       <div class="${classes}" data-ui-select="${id}">
         <span class="ui-field__label ${hideLabel ? 'ui-field__label--visually-hidden' : ''}" id="${id}-label">${label}</span>
@@ -141,7 +148,7 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
           </select>
           ${controlButton({
             className: 'ui-select__trigger',
-            content: `<span class="${displayValue ? '' : 'is-placeholder'}">${escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
+            content: `<span class="${displayValue ? '' : 'is-placeholder'}">${selectedContent || escapeAttribute(displayValue || placeholder)}</span><span class="ui-select__chevron" aria-hidden="true"></span>`,
             attributes: `id="${id}-trigger" aria-labelledby="${id}-label ${id}-trigger"${multiple ? '' : ' aria-haspopup="listbox"'} aria-expanded="false" aria-controls="${id}-options" data-ui-select-toggle="${id}" data-placeholder="${escapeAttribute(placeholder)}"${disabled ? ' disabled' : ''}`,
           })}
           <span class="ui-select__options" id="${id}-options" role="${multiple ? 'group' : 'listbox'}" aria-labelledby="${id}-label" hidden>
@@ -150,7 +157,7 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
               inputAttributes: `data-ui-select-checkbox="${id}" value="${escapeAttribute(option.value)}"${selectedValues.has(option.value) ? ' checked' : ''}${disabled ? ' disabled' : ''}`,
               boxContent: checkContent,
               content: `<span>${escapeAttribute(option.label)}</span>`,
-            }) : controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
+            }) : controlButton({ className: `ui-select__option ${selectedValues.has(option.value) ? 'is-selected' : ''}`, content: option.content || escapeAttribute(option.label), attributes: `role="option" aria-selected="${selectedValues.has(option.value)}" data-ui-select-option="${id}" data-value="${escapeAttribute(option.value)}"` })).join('')}
           </span>
         </span>
         <span class="ui-field__error" id="${id}-error" aria-live="polite">${error}</span>
@@ -180,22 +187,27 @@ export function fieldControl({ id, label, placeholder, options, multiple = false
     </label>`
 }
 
-export function fileControl({ id, label, file = null, inputAttributes = '', checkContent = '', clearContent = '' }) {
+export function fileControl({ id, label, file = null, files = [], multiple = false, inputAttributes = '', checkContent = '', clearContent = '' }) {
   const fileName = file?.name ? escapeAttribute(file.name) : ''
 
   return `
     <div class="ui-file-field" data-file-control="${id}">
       <span class="ui-field__label" id="${id}-label">${label}</span>
       <label class="ui-file-field__drop" for="${id}" data-file-drop="${id}">
-        <input class="visually-hidden" id="${id}" name="${id}" type="file" accept=".jpg,.jpeg,.png,.pdf" aria-labelledby="${id}-label ${id}-prompt" data-profile-file="${id}"${attributes(inputAttributes)}>
-        <span id="${id}-prompt">Выбери файл или перетяни их сюда</span>
+        <input class="visually-hidden" id="${id}" name="${id}" type="file" ${multiple ? 'multiple' : ''} accept=".jpg,.jpeg,.png,.pdf" aria-labelledby="${id}-label ${id}-prompt" aria-describedby="${id}-helper" data-profile-file="${id}"${attributes(inputAttributes)}>
+        <span id="${id}-prompt">${multiple ? 'Выбери файлы или перетяни их сюда' : 'Выбери файл или перетяни его сюда'}</span>
       </label>
       <div class="ui-file-field__selected" data-file-selected="${id}" ${fileName ? '' : 'hidden'}>
         <span class="ui-file-field__status" aria-hidden="true">${checkContent}</span>
         <span class="ui-file-field__name" data-file-name>${fileName}</span>
         ${controlButton({ className: 'ui-file-field__clear', content: clearContent, attributes: `aria-label="Удалить файл" data-file-clear="${id}"` })}
       </div>
-      <span class="ui-file-field__helper">Файлы форматов jpg, png и pdf, не более 5 МБ</span>
+      ${multiple ? files.map((item) => `<div class="ui-file-field__selected" data-file-entry="${escapeAttribute(item.id)}">
+        <span class="ui-file-field__status" aria-hidden="true">${checkContent}</span>
+        <span class="ui-file-field__name">${escapeAttribute(item.name)}</span>
+        ${controlButton({ className: 'ui-file-field__clear', content: clearContent, attributes: `aria-label="Удалить файл ${escapeAttribute(item.name)}" data-file-clear="${id}" data-file-id="${escapeAttribute(item.id)}"` })}
+      </div>`).join('') : ''}
+      <span class="ui-file-field__helper" id="${id}-helper">Файлы форматов jpg, png и pdf, не более 5 МБ${multiple ? ' каждый' : ''}</span>
       <span class="ui-field__error" id="${id}-error" aria-live="polite"></span>
     </div>`
 }
