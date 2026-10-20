@@ -132,12 +132,13 @@ const stagesByKind = { industry: industryStages, science: scienceStages, busines
 
 export function getCareerStages(goal) {
   const stages = stagesByKind[goal?.kind || 'industry'] || []
-  return stages.map((stage) => ({
+  const checklist = stages.map((stage) => ({
     ...stage,
     tasks: stage.tasks
       .map((task, index) => [task[0], task[1], task[2], { ...task[3], id: `${stage.id}-${index}` }])
       .filter((task) => !task[3].goals || task[3].goals.includes(goal?.id || 'first-job')),
   })).filter((stage) => stage.tasks.length > 0)
+  return checklist
 }
 
 export function careerTaskId(stage, index) {
