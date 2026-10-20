@@ -96,7 +96,7 @@ input, select { caret-color: var(--purple); }
 .ui-multiselect.is-open .ui-multiselect__chevron { transform: rotate(180deg); }
 .ui-multiselect__options { position: absolute; z-index: 12; top: calc(100% + 4px); left: 0; display: flex; width: 100%; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 28px rgb(28 28 30 / 14%); }
 .ui-multiselect__options[hidden] { display: none !important; }
-.ui-multiselect__option { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; font-size: 14px; line-height: 20px; }
+.ui-multiselect__option { display: flex; flex-shrink: 0; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; font-size: 14px; line-height: 20px; }
 .ui-multiselect__option:hover { background: var(--surface-alt); }
 
 .app-shell { min-height: 100vh; overflow-x: hidden; }
@@ -1721,4 +1721,16 @@ body.is-planner-dragging :is(button, a[href], .ui-checkbox, .ui-toggle, .educati
 .saved-goal__header-extra { margin-top: -12px; padding: 0 32px 24px; }
 @media (max-width: 600px) {
   .saved-goal__header-extra { padding-inline: 20px; padding-bottom: 20px; }
+}
+
+.goal-confetti { position: fixed; inset: 0; z-index: 1000; width: 100%; height: 100%; pointer-events: none; }
+
+.goal-card__icon--complete { background: #e0f5ed; }
+.goal-card__icon--complete > .icon { filter: none; }
+
+.goal-completion { padding: 20px 32px; border-radius: 16px; background: var(--surface); }
+.goal-completion__check { display: flex; width: 100%; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; font-weight: 500; }
+
+@media (max-width: 600px) {
+  .goal-completion { padding-inline: 20px; }
 }

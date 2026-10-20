@@ -1,8 +1,10 @@
-import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, formatDateValue, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=31'
+import { checkboxControl, chipControl, contextMenuControl, controlButton, fieldControl, fileControl, formatDateValue, linkControl, multiSelectControl, positionDropdown, tabControl, toggleControl } from './components/controls.js?v=32'
 import { COURSE_CATALOG_SOURCE, courseCatalog } from './components/courses.js?v=2'
 import { normalizeRequisiteNames, requisiteIsSatisfied } from './components/course-requisites.js?v=2'
 
-import { getCareerStages, careerTaskId } from './components/career-checklists.js?v=1'
+import { getCareerStages, careerTaskId } from './components/career-checklists.js?v=3'
+
+import { launchGoalConfetti } from './components/goal-confetti.js?v=1'
 
 import { readProfileFile, writeProfileFiles } from './components/profile-files.js?v=1'
 
@@ -628,8 +630,8 @@ function saveStudyProgress(taskIds) {
 }
 
 function getStudyProgressSummary(progress = getStudyProgress()) {
-  const totalTasks = studyStages.reduce((sum, stage) => sum + stage.tasks.length, 0)
-  const completedTasks = studyStages.reduce((sum, stage) => sum + stage.tasks.filter((_, index) => progress.has(`${stage.id}-${index}`)).length, 0)
+  const totalTasks = studyStages.reduce((sum, stage) => sum + stage.tasks.length, 0) + 1
+  const completedTasks = studyStages.reduce((sum, stage) => sum + stage.tasks.filter((_, index) => progress.has(`${stage.id}-${index}`)).length, 0) + Number(progress.has('semester-3'))
   const completedStages = studyStages.filter((stage) => stage.tasks.every((_, index) => progress.has(`${stage.id}-${index}`))).length
   return { totalTasks, completedTasks, completedStages, percent: Math.round((completedTasks / totalTasks) * 100) }
 }
@@ -662,8 +664,8 @@ function saveIndustryProgress(taskIds, goal = getActiveCareerGoal()) {
 
 function getIndustryProgressSummary(progress = getIndustryProgress(), goal = getActiveCareerGoal()) {
   const stages = getCareerStages(goal)
-  const totalTasks = stages.reduce((sum, stage) => sum + stage.tasks.length, 0)
-  const completedTasks = stages.reduce((sum, stage) => sum + stage.tasks.filter((_, index) => progress.has(careerTaskId(stage, index))).length, 0)
+  const totalTasks = stages.reduce((sum, stage) => sum + stage.tasks.length, 0) + 1
+  const completedTasks = stages.reduce((sum, stage) => sum + stage.tasks.filter((_, index) => progress.has(careerTaskId(stage, index))).length, 0) + Number(progress.has('goal-complete'))
   const completedStages = stages.filter((stage) => stage.tasks.every((_, index) => progress.has(careerTaskId(stage, index)))).length
   return { totalTasks, completedTasks, completedStages, percent: totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0 }
 }
@@ -1208,13 +1210,14 @@ function workExperienceTemplate() {
         ${privacyNote()}
 
         <div class="work-step__layout">
-          <form class="work-form" data-onboarding-step="work" novalidate>
+          <form class="work-form" data-onboarding-step="work" aria-describedby="work-experience-description" novalidate>
             <div class="work-form__heading">
               ${isEditingOnboarding() ? '' : '<span>Шаг 1 из 2</span>'}
               <h2>${editingProfile ? 'Опыт работы' : 'Расскажи о своей работе'}</h2>
+              <p class="work-form__description" id="work-experience-description">Расскажи о текущем или последнем месте работы, чтобы мы могли учитывать твой опыт при подборе вакансий. Если опыта работы пока нет, отметь «Еще не работал».</p>
             </div>
             <div class="work-form__fields" data-work-fields>
-              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-work ${values.noWork ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Сейчас не работаю</span>' })}
+              ${checkboxControl({ className: 'work-checkbox', inputAttributes: `data-no-work ${values.noWork ? 'checked' : ''}`, boxContent: icon('check-small.svg', 20), content: '<span>Еще не работал</span>' })}
               ${fieldControl({ id: 'company', label: 'Компания*', placeholder: 'Название компании', value: values.company || '', inputAttributes: fieldsDisabled, errorMessage: 'Укажи название компании' })}
               ${fieldControl({ id: 'specialty', label: 'Специальность*', placeholder: 'Выбери наиболее подходящую специальность', value: normalizeOnboardingSpecialty(values.specialty), inputAttributes: fieldsDisabled, options: ONBOARDING_SPECIALTY_OPTIONS, errorMessage: 'Выбери специальность' })}
               ${fieldControl({ id: 'position', label: 'Позиция', placeholder: 'Например, Backend-разработчик на Python', value: values.position ?? (values.specialtyOther || (values.specialty && !ONBOARDING_SPECIALTY_OPTIONS.includes(values.specialty) ? values.specialty : '')), inputAttributes: fieldsDisabled, required: false })}
@@ -1319,7 +1322,7 @@ function studyStageTemplate(stage, stageIndex, progress) {
                   boxContent: icon('check-small.svg', 20),
                   content: `<span class="study-task__copy">
                     <strong>${title}</strong>
-                    <span>${description}</span>
+                    ${description ? `<span>${description}</span>` : ''}
                   </span>`,
                 })}`
             }).join('')}
@@ -1375,7 +1378,7 @@ function industryStageTemplate(stage, stageIndex, progress, goal = null) {
                   className: 'industry-task__check',
                   inputAttributes: `${goal ? `data-saved-goal-task="${goal.id}"` : 'data-industry-task'} value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
                   boxContent: icon('check-small.svg', 20),
-                  content: `<span class="study-task__copy"><strong>${title}</strong><span>${description}</span></span>`,
+                  content: `<span class="study-task__copy"><strong>${title}</strong>${description ? `<span>${description}</span>` : ''}</span>`,
                 })}
                 ${action ? `<span class="industry-task__action-wrap">${controlButton({
                   variant: 'flat-outline',
@@ -1782,6 +1785,7 @@ function studyGoalTemplate() {
             <div class="study-goal-shell">
               <div class="study-goal-summary-island">
                 <div class="study-goal-shell__meta">
+                  ${goalCompletionIcon(goals.find((goal) => goal.id === 'study'), progress.has('semester-3'))}
                   <strong>Учеба</strong>
                   <span class="badge badge--positive">${icon('check-verified.svg', 16)}<span data-study-stage-summary>${summary.completedStages} из ${studyStages.length} завершено</span></span>
                   ${goalDetailActions('study')}
@@ -1801,6 +1805,7 @@ function studyGoalTemplate() {
                 <p>Этапы без строгого пути: действия идут параллельно, а не строго друг за другом.</p>
                 <div class="study-stage-list">
                   ${studyStages.map((stage, index) => studyStageTemplate(stage, index, progress)).join('')}
+                  ${goalCompletionTemplate(progress, null, true)}
                 </div>
               </section>
             </div>
@@ -2307,7 +2312,7 @@ function profileQuestionnaireTemplate() {
     <div class="questionnaire-summary__body">
       <section class="questionnaire-summary__section" aria-labelledby="questionnaire-work-title">
         <h2 id="questionnaire-work-title">Опыт работы</h2>
-        ${values.noWork ? '<p>Сейчас не работаю</p>' : `<dl class="questionnaire-summary__fields">${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl>`}
+        ${values.noWork ? '<p>Еще не работал</p>' : `<dl class="questionnaire-summary__fields">${fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl>`}
       </section>
       <section class="questionnaire-summary__section" aria-labelledby="questionnaire-goal-title">
         <h2 id="questionnaire-goal-title">${goalHeading}</h2>
@@ -2571,6 +2576,7 @@ function industryGoalTemplate() {
             <div class="study-goal-shell">
               <div class="study-goal-summary-island">
                 <div class="study-goal-shell__meta">
+                  ${goalCompletionIcon(selectedGoal, progress.has('goal-complete'))}
                   <strong>${selectedGoal?.category || 'Индустрия'}</strong>
                   <span class="badge badge--positive">${icon('check-verified.svg', 16)}<span data-industry-stage-summary>${summary.completedStages} из ${careerStages.length} завершено</span></span>
                   ${goalDetailActions(selectedGoal?.kind || 'industry')}
@@ -2590,6 +2596,7 @@ function industryGoalTemplate() {
                 <p>Этапы без строгого пути: действия идут параллельно, а не строго друг за другом.</p>
                 <div class="study-stage-list">
                   ${careerStages.map((stage, index) => industryStageTemplate(stage, index, progress)).join('')}
+                  ${goalCompletionTemplate(progress)}
                 </div>
               </section>
             </div>
@@ -2607,6 +2614,41 @@ function industryGoalTemplate() {
       </main>
       <div id="modal-root"></div>
     </div>`
+}
+
+function goalCompletionTemplate(progress, goal = null, study = false) {
+  const taskId = study ? 'semester-3' : 'goal-complete'
+  const taskAttributes = study ? 'data-study-task' : goal ? `data-saved-goal-task="${goal.id}"` : 'data-industry-task'
+  return `<div class="goal-completion">${checkboxControl({
+    className: 'goal-completion__check',
+    inputAttributes: `${taskAttributes} data-goal-complete value="${taskId}" ${progress.has(taskId) ? 'checked' : ''}`,
+    boxContent: icon('check-small.svg', 20),
+    content: '<span>Цель завершена</span>',
+  })}</div>`
+}
+
+function goalCompletionIcon(goal, completed) {
+  goal ||= goals[0]
+  return `<span class="goal-card__icon goal-card__icon--${goal.kind} ${completed ? 'goal-card__icon--complete' : ''}" data-goal-status-icon="${goal.id}" ${completed ? 'role="img" aria-label="Цель завершена"' : 'aria-hidden="true"'}>${icon(completed ? 'check-green.svg' : iconByKind[goal.kind], 18)}</span>`
+}
+
+function updateGoalCompletionIcon(field) {
+  const container = field.closest('[data-saved-goal]') || root
+  const status = container.querySelector('[data-goal-status-icon]')
+  const goal = goals.find((item) => item.id === status?.dataset.goalStatusIcon)
+  if (!goal) return
+  const completed = field.checked
+  status.classList.toggle('goal-card__icon--complete', completed)
+  status.innerHTML = icon(completed ? 'check-green.svg' : iconByKind[goal.kind], 18)
+  if (completed) {
+    status.removeAttribute('aria-hidden')
+    status.setAttribute('role', 'img')
+    status.setAttribute('aria-label', 'Цель завершена')
+  } else {
+    status.setAttribute('aria-hidden', 'true')
+    status.removeAttribute('role')
+    status.removeAttribute('aria-label')
+  }
 }
 
 function savedGoalCard(goal) {
@@ -2629,7 +2671,7 @@ function savedGoalCard(goal) {
   return `<article class="saved-goal saved-goal--inline ${expanded ? 'saved-goal--expanded' : ''}" data-expandable-island data-saved-goal="${goal.id}">
     ${expandableCardHeader({
       title: goal.title, titleId: `saved-goal-title-${goal.id}`, panelId, expanded, type: 'goal',
-      meta: `<span class="goal-card__heading"><span class="goal-card__icon goal-card__icon--${goal.kind}">${icon(iconByKind[goal.kind], 18, 'icon goal-card__icon-default')}</span><span class="goal-card__category">${goal.category}</span></span>`,
+      meta: `<span class="goal-card__heading">${goalCompletionIcon(goal, progress.has('goal-complete'))}<span class="goal-card__category">${goal.category}</span></span>`,
       extra: getSavedGoalIds().length > 1 ? toggleControl({ className: 'saved-goal__primary', inputAttributes: `data-primary-goal="${goal.id}" ${primaryId === goal.id ? 'checked' : ''}`, label: 'Основная цель' }) : '',
       toggleAttributes: 'data-saved-goal-toggle', deleteAttributes: `data-delete-current-goal="${goal.id}"`,
     })}
@@ -2637,6 +2679,7 @@ function savedGoalCard(goal) {
       <div class="study-stage__panel-inner">
         <div class="saved-goal__checklist">
           ${getCareerStages(goal).map((stage, index) => industryStageTemplate(stage, index, progress, goal)).join('')}
+          ${goalCompletionTemplate(progress, goal)}
         </div>
       </div>
     </div>
@@ -4470,6 +4513,11 @@ document.addEventListener('click', (event) => {
 })
 
 root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-goal-complete]')) {
+    updateGoalCompletionIcon(event.target)
+    if (event.target.checked) launchGoalConfetti()
+  }
+
   if (event.target.matches('[data-career-goal-slot]')) {
     const index = Number(event.target.dataset.careerGoalSlot)
     const rows = getGoalSelectionRows()

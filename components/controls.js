@@ -277,7 +277,9 @@ export function positionDropdown(field) {
 
   const styles = getComputedStyle(menu)
   const heightLimit = Number.parseFloat(styles.maxHeight) || Infinity
-  const widthLimit = Number.parseFloat(styles.maxWidth) || Infinity
+  const widthLimit = styles.maxWidth.endsWith('%')
+    ? (Number.parseFloat(styles.maxWidth) / 100) * (menu.offsetParent?.clientWidth || field.clientWidth)
+    : Number.parseFloat(styles.maxWidth) || Infinity
   menu.style.maxWidth = `${Math.min(widthLimit, Math.max(0, bounds.right - bounds.left))}px`
   const anchor = trigger.getBoundingClientRect()
   const desiredHeight = Math.min(menu.scrollHeight + menu.offsetHeight - menu.clientHeight, heightLimit)
