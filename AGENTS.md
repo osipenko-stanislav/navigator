@@ -48,15 +48,17 @@
 - Mark the final form in a goal-setting flow with `data-goal-form-final`; after successful component validation, submit it through the shared page-background transition to `surveyCompleteTemplate()`.
 - Intermediate forms may use `data-goal-form`, but must continue to the next step instead of showing success early.
 - Do not create goal-specific success screens unless the user explicitly replaces this rule.
-- A student can keep at most two goals. Persist selected goal IDs between route entries and enforce the limit both when choosing and when rendering goals.
-- Allow one or two career goals, with no more than one goal per track: Industry, Science, Entrepreneurship. Study is available by default and is not a selectable career goal.
-- Keep the `+ Цель` button enabled at the two-goal limit. At the limit, clicking it must open a warning that one current goal needs to be deleted before adding another.
-- Render only goals the student has actually added; one saved goal produces one goal card, and two saved goals produce two cards.
-- A single career goal is automatically primary and shows no primary switch. With two goals, show the shared Основная цель toggle under each title, keep exactly one primary goal, persist the choice, and transfer primary status when that goal is deleted.
+- A student can keep at most three goals. Persist selected goal IDs between route entries and enforce the limit both when choosing and when rendering goals.
+- Allow up to three selected goals, with no more than one goal per track: Industry, Science, Business, Study. A student with no career plans can select Study as their first goal. Study is offered only in the first selector; additional selectors offer unused career tracks. The total limit includes Study.
+- Keep the `+ Цель` button enabled at the three-goal limit. At the limit, clicking it must open a warning that one current goal needs to be deleted before adding another.
+- Render only goals the student has actually added; one saved goal produces one goal card, and three saved goals produce three cards.
+- The first selected goal is automatically primary. A single goal shows no primary switch. With two or three goals, show the shared Основная цель toggle under each title, keep exactly one primary goal, persist the choice, and transfer primary status when that goal is deleted.
+- The second form step uses shared select controls styled like goal cards: icon at the left and plain track name above the goal description, with both text lines sharing the same left edge. Additional goal fields are added with an outline button, and already used tracks are excluded.
+- Selecting first-job, change-specialty, or change-company in any slot shows a required multiple-position select and a required single-grade select, using the existing grade options. Other goals do not show these questions. Persist their answers and validate through shared input states.
 - Saved career goals are separate expandable islands with inline checklists and chevron controls. Do not show progress bars, percentages, completion counters, or an Open action in these cards. New goals start with all tasks unchecked.
 - Career cards must display the selected goal’s actual track and maintain progress independently between tracks. Removing or adding career goals must not reset the separate study plan.
-- The Study goal opens `/study-goal/`. Its progress is derived from completed checklist tasks, and an entire stage counts as complete only when all of its tasks are checked.
-- Open the Study goal on its `Моя цель` tab by default; other tabs open only after an explicit tab selection.
+- The selectable Study goal is a static card with no expansion control, checklist, progress, or navigation action. Selecting or deleting it must not reset the separate Study planner. The legacy `/study-goal/` route and its checklist remain separate from this card.
+- Open the legacy Study detail on its `Моя цель` tab by default; other tabs open only after an explicit tab selection.
 - Study-detail tabs use one animated sliding background indicator and remain keyboard-accessible.
 
 ## Study planner
@@ -77,6 +79,7 @@
 - Do not invent missing components or icons. Ask the user to add the required Figma instance when the subscribed libraries do not contain it.
 - The prototype is local-only: persist the semester plan in `localStorage` and simulate trajectory generation without APIs or authentication.
 - Support eight semesters, course add/remove/move/reorder, completion, search, filters, workload totals, prerequisite conflicts, per-semester reset, full reset, and trajectory presets.
+- The current semester is 3. Initialize semesters 1 and 2 with completed historical courses, and backfill empty past semesters in saved plans without replacing existing past courses, changing future semesters, or duplicating course placements.
 
 ## Study catalog and glossary
 
